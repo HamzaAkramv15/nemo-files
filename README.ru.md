@@ -5,14 +5,15 @@
 ## Установка
 
 ```sh
-./install.sh
+chmod +x yami-files
+./yami-files install
 ```
 
-Нужен Rust 1.89 или новее, root не нужен. Ставится в `~/.local`. `./install.sh --deps` — что нужно от системы, `./install.sh --uninstall` — удалить.
+Один файл, без Rust и root. `install` спросит настройки, покажет, что изменит, и поставит в `~/.local` только после твоего «да» (`--yes` без вопросов, `--all` ещё и включает все опции). `./yami-files deps` — что нужно от системы, `./yami-files uninstall` — удалить. Собрать самому: Rust 1.89 или новее, `cargo build --release --locked`, затем `target/release/yami-files install`.
 
 ## Как пользоваться
 
-Диалог выбора файлов — бэкенд `xdg-desktop-portal`: `install.sh` его регистрирует, остаётся добавить `org.freedesktop.impl.portal.FileChooser=yami;gtk;` в свой `portals.conf`.
+Диалог выбора файлов — бэкенд `xdg-desktop-portal`: `install` регистрирует его, если ты согласишься, остаётся добавить `org.freedesktop.impl.portal.FileChooser=yami;gtk;` в свой `portals.conf`.
 
 `yami-files [ПАПКА]`, `yami-files --pick open|save`, `yami-files shot -o ПАПКА`.
 

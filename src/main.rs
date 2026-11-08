@@ -12,6 +12,7 @@
 //   yami-files --unlock /dev/…         пароль зашифрованного диска (спрашивает и yami-agents)
 //   yami-files shot [ЦЕЛЬ…] [--lang en] [-o ПАПКА]   снимки окна в PNG без Wayland
 
+mod setup;
 mod act;
 mod app;
 mod ask;
@@ -94,13 +95,16 @@ fn pick_from_args(args: &[String]) -> (fm::Pick, Vec<PathBuf>) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(c) = yami_px::install::dispatch(&setup::SPEC, &args[1..]) {
+        std::process::exit(c);
+    }
     match args.get(1).map(|s| s.as_str()) {
         Some("--version") => {
             println!("yami-files {}", env!("CARGO_PKG_VERSION"));
             return;
         }
         Some("-h") | Some("--help") => {
-            println!("yami-files [DIR…] | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… | --portal | --portal-reload | shot [TARGET…] [--lang en] [-o DIR]");
+            println!("yami-files [DIR…] | install | uninstall | deps | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… | --portal | --portal-reload | shot [TARGET…] [--lang en] [-o DIR]");
             return;
         }
         Some("shot") => std::process::exit(shot::run(&args[2..])),

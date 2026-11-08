@@ -5,14 +5,15 @@ File manager for Wayland and the file dialog of every app. A part of the [yami](
 ## Install
 
 ```sh
-./install.sh
+chmod +x yami-files
+./yami-files install
 ```
 
-Needs Rust 1.89 or newer, no root. It installs into `~/.local`. `./install.sh --deps` lists what it wants from the system, `./install.sh --uninstall` removes it.
+One file, no Rust and no root. `install` asks for the settings, lists what it will change and installs into `~/.local` only after your yes (`--yes` skips the questions, `--all` also turns on every option). `./yami-files deps` lists what it wants from the system, `./yami-files uninstall` removes it. To build it yourself: Rust 1.89 or newer, `cargo build --release --locked`, then `target/release/yami-files install`.
 
 ## Use
 
-The file dialog is an `xdg-desktop-portal` backend: `install.sh` registers it, then put `org.freedesktop.impl.portal.FileChooser=yami;gtk;` into your `portals.conf`.
+The file dialog is an `xdg-desktop-portal` backend: `install` registers it if you agree, then put `org.freedesktop.impl.portal.FileChooser=yami;gtk;` into your `portals.conf`.
 
 `yami-files [FOLDER]`, `yami-files --pick open|save`, `yami-files shot -o DIR`.
 
