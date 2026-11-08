@@ -1,4 +1,4 @@
-// Настройки файлового менеджера: ~/.config/yami-files.json (палитра и язык — из шелла).
+// Настройки файлового менеджера: ~/.config/yami-files.json (вид и язык — style.json).
 
 use serde::{Deserialize, Serialize};
 

@@ -289,7 +289,7 @@ pub fn run(fm_init: impl FnOnce(Option<calloop::channel::Sender<Msg>>) -> Fm) ->
 
 impl App {
     pub(crate) fn tick(&mut self) {
-        // настройки шелла поменялись — новые цвета, язык
+        // вид поменялся — новые цвета, язык
         if self.fm.look.stale() {
             let font = self.fm.look.font("files").to_string();
             self.fm.look = crate::look::Look::load("files");

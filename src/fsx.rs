@@ -125,7 +125,7 @@ impl Sort {
     }
 }
 
-/// «естественное» сравнение: file2 < file10 (общее с шеллом, yami-px)
+/// «естественное» сравнение: file2 < file10 (yami-px)
 pub use crate::paths::natural;
 
 pub fn sort(v: &mut [Entry], by: Sort, desc: bool, dirs_first: bool) {
@@ -293,7 +293,7 @@ pub fn free_name(dir: &Path, name: &str) -> PathBuf {
     p
 }
 
-/// путь «~/…» для показа (общее с шеллом, yami-px)
+/// путь «~/…» для показа (yami-px)
 pub use crate::paths::pretty;
 
 /// размер каталога целиком (файлы, папки) — для свойств, в отдельной нити

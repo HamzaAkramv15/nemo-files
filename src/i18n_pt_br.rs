@@ -34,7 +34,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("clipboard is empty", "a área de transferência está vazia"),
     ("close", "fechar"),
     ("code", "código"),
-    ("colours and language come from the shell settings (mod+s)", "cores e idioma vêm das configurações do shell (mod+s)"),
+    ("look and language: ~/.config/yami/style.json", "aparência e idioma: ~/.config/yami/style.json"),
     ("compress", "compactar"),
     ("compressing", "compactando"),
     ("connect anyway", "conectar mesmo assim"),

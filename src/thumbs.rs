@@ -28,7 +28,7 @@ fn has(cmd: &str) -> bool {
 
 fn make(r: &Req) -> Option<Img> {
     if !r.video {
-        // картинки: общий с шеллом декод и кеш (yami-px)
+        // картинки: общий декод и кеш (yami-px)
         return crate::icons::thumb(&r.path, r.mtime, r.size).map(|t| crate::icons::from_rgba(&t));
     }
     let cp = cache_path(r);

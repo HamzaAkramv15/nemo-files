@@ -1,4 +1,4 @@
-// yami-files — файловый менеджер в пиксельном стиле шелла yami. Своё окно, свой рендер в shm,
+// yami-files — файловый менеджер для Wayland. Своё окно, свой рендер в shm,
 // никаких тулкитов: ~3 МБ бинарь, десяток мегабайт памяти. Тот же бинарь — диалог выбора
 // файлов для xdg-desktop-portal (браузеры, Telegram, всё на GTK/Qt через портал).
 //
@@ -9,7 +9,7 @@
 //   yami-files --portal                бэкенд org.freedesktop.impl.portal.FileChooser и
 //                                      org.freedesktop.FileManager1 («показать в папке»)
 //   yami-files --props ФАЙЛ…           свойства файлов
-//   yami-files --unlock /dev/…         пароль зашифрованного диска (карточка автоподключения шелла)
+//   yami-files --unlock /dev/…         пароль зашифрованного диска (спрашивает и yami-agents)
 //   yami-files shot [ЦЕЛЬ…] [--lang en] [-o ПАПКА]   снимки окна в PNG без Wayland
 
 mod act;

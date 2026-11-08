@@ -8,9 +8,7 @@
 // ~/.local/share/dbus-1/services — всё кладёт установщик (шаг «портал»).
 //
 // Новый бинарь (обновление, tools/deploy.sh): `yami-files --portal-reload` шлёт SIGHUP, портал
-// exec'ает себя заново, как только свободен (ни показа экрана, ни открытого диалога), — идущая
-// трансляция не рвётся. Портала без бэкенда быть не должно: xdg-desktop-portal берёт типы
-// источников ScreenCast у живого бэкенда, без него OBS и браузеры не видят, что показывать.
+// exec'ает себя заново, как только свободен (нет открытого диалога).
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
