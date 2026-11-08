@@ -26,6 +26,7 @@ shadows, light or dark as your system is set. Everything can be changed:
 |---|---|
 | `~/.config/yami/style.json` | the look of every yami module |
 | `~/.config/yami/style.files.json` | what this module does differently (only those keys) |
+| `~/.config/yami/files.json` | the file manager itself: view, sidebar, terminal (it moved here from `~/.config/yami-files.json`) |
 
 | Key | Values |
 |---|---|

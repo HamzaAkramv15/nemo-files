@@ -1,6 +1,6 @@
 // Боковая панель: места (дом, папки XDG, корзина) и закладки (общие с GTK:
 // ~/.config/gtk-3.0/bookmarks) одним списком в своём порядке — его тянут мышью, лишнее прячут
-// (yami-files.json: placesOrder, placesHidden); устройства (lsblk; подключение через udisksctl,
+// (files.json: placesOrder, placesHidden); устройства (lsblk; подключение через udisksctl,
 // зашифрованные — через gio с паролем; телефоны и сеть — remote.rs через gvfs).
 
 use crate::picons::Special;

@@ -1,4 +1,4 @@
-// Настройки файлового менеджера: ~/.config/yami-files.json (вид и язык — style.json).
+// Настройки файлового менеджера: ~/.config/yami/files.json (вид и язык — style.json).
 
 use serde::{Deserialize, Serialize};
 
@@ -74,7 +74,7 @@ impl Default for Cfg {
 }
 
 pub fn path() -> std::path::PathBuf {
-    crate::paths::config_dir().join("yami-files.json")
+    crate::paths::module_settings("files")
 }
 
 impl Cfg {

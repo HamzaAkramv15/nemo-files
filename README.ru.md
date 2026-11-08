@@ -26,6 +26,7 @@ chmod +x yami-files
 |---|---|
 | `~/.config/yami/style.json` | вид всех модулей yami |
 | `~/.config/yami/style.files.json` | чем этот модуль отличается (только эти ключи) |
+| `~/.config/yami/files.json` | сам файловый менеджер: вид, боковая панель, терминал (раньше `~/.config/yami-files.json`) |
 
 | Ключ | Значения |
 |---|---|
