@@ -39,8 +39,11 @@ fn make(r: &Req) -> Option<Img> {
         return None;
     }
     let _ = std::fs::create_dir_all(cp.parent()?);
-    let ok = std::process::Command::new("ffmpegthumbnailer").arg("-i").arg(&r.path).arg("-o").arg(&cp).args(["-s", &r.size.to_string(), "-c", "png", "-q", "6"]).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false);
-    if !ok {
+    // во временный файл: полкартинки под настоящим именем кеш выдал бы за готовую
+    let tmp = crate::icons::thumb_tmp(&cp);
+    let ok = std::process::Command::new("ffmpegthumbnailer").arg("-i").arg(&r.path).arg("-o").arg(&tmp).args(["-s", &r.size.to_string(), "-c", "png", "-q", "6"]).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false);
+    if !ok || std::fs::rename(&tmp, &cp).is_err() {
+        let _ = std::fs::remove_file(&tmp);
         return None;
     }
     let t = image::open(&cp).ok()?.thumbnail(r.size as u32, r.size as u32).to_rgba8();
