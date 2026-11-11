@@ -62,9 +62,10 @@ pub fn run(args: &[String]) -> i32 {
         match a.as_str() {
             "--lang" => lang = it.next().cloned().unwrap_or_default(),
             "-o" | "--out" => out = it.next().map(PathBuf::from).unwrap_or(out),
+            "--fit" => {}
             "--theme" => mode = it.next().map(|m| m == "light"),
             "-h" | "--help" | "list" => {
-                println!("yami-files shot [TARGET…] [--lang ru|en] [--theme dark|light] [-o DIR]\ntargets: {}", TARGETS.join(" "));
+                println!("yami-files shot [TARGET…] [--lang ru|en] [--theme dark|light] [--fit] [-o DIR]\ntargets: {}", TARGETS.join(" "));
                 return 0;
             }
             t if TARGETS.contains(&t) => targets.push(t.to_string()),
@@ -83,7 +84,10 @@ pub fn run(args: &[String]) -> i32 {
     }
     look.animations = false;
     crate::i18n::set(&look.lang);
-    crate::i18n::audit(lang == "en" || yami_px::i18n::normalize(&lang) == "pt-BR");
+    // русская надпись без перевода — ошибка на любом языке, кроме русского; `--fit`: надписи, которым тесно
+    let audit = !matches!(yami_px::i18n::normalize(&lang), "ru" | "");
+    crate::i18n::audit(audit);
+    yami_px::gfx::watch_text(args.iter().any(|a| a == "--fit"));
     let root = std::env::temp_dir().join(format!("yami-files-shot-{}", std::process::id()));
     fixture(&root);
     let _ = std::fs::create_dir_all(&out);
@@ -232,6 +236,8 @@ pub fn run(args: &[String]) -> i32 {
         // два прохода: первый узнаёт раскладку (колонки, высоты), второй рисует
         for _ in 0..2 {
             let mut ui = Ui { cv: Canvas::new(&mut buf, w, h), f: &mut fonts, ic: &mut icons, t: look.theme, zones: vec![], ptr: None, down: false, anim: false, blink: true, tr: crate::i18n::tr };
+            // shot --fit смотрит только последний проход
+            let _ = yami_px::gfx::take_text();
             crate::draw::draw(&mut ui, &fm, w, h);
         }
         // миниатюры — синхронно, чтобы попали в снимок
@@ -242,12 +248,19 @@ pub fn run(args: &[String]) -> i32 {
                 fm.put_thumb((r.path, r.size), img);
             }
             let mut ui = Ui { cv: Canvas::new(&mut buf, w, h), f: &mut fonts, ic: &mut icons, t: look.theme, zones: vec![], ptr: None, down: false, anim: false, blink: true, tr: crate::i18n::tr };
+            // shot --fit смотрит только последний проход
+            let _ = yami_px::gfx::take_text();
             crate::draw::draw(&mut ui, &fm, w, h);
         }
         let path = out.join(format!("{t}.png"));
         save_png(&buf, w, h, &path);
         println!("{}", path.display());
-        if lang == "en" || yami_px::i18n::normalize(&lang) == "pt-BR" {
+        // a-very-long-file-name… в образцовой папке и сделано, чтобы сокращаться
+        for p in yami_px::gfx::fit_report().into_iter().filter(|p| !p.contains("a-very-long-file-name")) {
+            println!("  layout [{t}]: {p}");
+            bad = 1;
+        }
+        if audit {
             let missed = crate::i18n::take_missed();
             for m in &missed {
                 println!("  untranslated [{t}]: {m}");

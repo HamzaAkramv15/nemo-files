@@ -125,7 +125,7 @@ restyles itself the moment you save them:
 | `animations`, `animSpeed` | on or off; their length (0.5 fast, 2 slow) |
 | `iconTheme`, `iconPixel`, `iconTint` | an icon set; icons redrawn as pixel art; in the palette's tones |
 | `colors` | any of `bg panel surface surfaceHi codeBg border dim accent deep glow bright selection text textDim textFaint onAccent textHi ok warn` |
-| `lang` | `ru`, `en`, `pt-BR`; empty: as the system |
+| `lang` | `ru`, `en`, `pt-BR`, `es`, `de`, `fr`, `uk`, `pl`; empty: as the system |
 
 A theme of your own, for example a cold dark one:
 

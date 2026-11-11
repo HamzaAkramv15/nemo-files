@@ -164,11 +164,15 @@ pub fn draw(ui: &mut Ui, fm: &Fm, w: i32, h: i32) {
     if let Some(r) = l.pick {
         pick_bar(ui, fm, r);
     }
+    // всплывашка, диалог и меню ложатся поверх окна: для проверки вёрстки (shot --fit) это новый слой
+    yami_px::gfx::text_layer();
     toast(ui, fm, w, l.status.y);
     if let Some((d, born)) = &fm.dlg {
+        yami_px::gfx::text_layer();
         crate::dialogs::dialog(ui, fm, d, *born, w, h);
     }
     if let Some(m) = &fm.menu {
+        yami_px::gfx::text_layer();
         menu(ui, fm, m, w, h);
     }
     // проявление окна целиком при открытии
@@ -496,6 +500,7 @@ pub(crate) fn sidebar(ui: &mut Ui, fm: &Fm, r: R) {
                 ui.cv.fill(R::new(x, top + slot as i32 * rh - 1, w, 2), t.red);
             }
             if let Some(p) = fm.side.get(from) {
+                yami_px::gfx::text_layer();
                 let gr = R::new(x, (py as i32 - rh / 2).clamp(top - rh / 2, top + fm.side.len() as i32 * rh - rh / 2), w, rh);
                 ui.cv.pxbox(gr, &BoxStyle::new(t.surface_hi, t.red));
                 picons::draw(&mut ui.cv, &t, Kind::Dir, p.sp, gr.x + 8, gr.y + (rh - 16) / 2, 1, picons::Look { dim: false, link: false, selected: true });
@@ -808,8 +813,10 @@ pub(crate) fn pick_bar(ui: &mut Ui, fm: &Fm, r: R) {
         rx -= 10;
     }
     if p.save {
-        ui.text_in(PX, R::new(x, by, 50, bh), "имя", t.text_dim);
-        x += ui.w(PX, "имя") + 12;
+        // подпись шириной в само слово на языке интерфейса
+        let lw = ui.w(PX, "имя");
+        ui.text_in(PX, R::new(x, by, lw + 2, bh), "имя", t.text_dim);
+        x += lw + 12;
         let nr = R::new(x, by, (rx - x).max(80), bh);
         ui.cv.pxbox(nr, &BoxStyle::new(t.code_bg, if p.name_focus { t.red } else { t.border }));
         field_text(ui, R::new(nr.x + 10, nr.y, nr.w - 20, nr.h), &p.name, "имя файла", p.name_focus);
