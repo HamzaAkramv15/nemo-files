@@ -305,7 +305,10 @@ fn run(job: Job, send: &dyn Fn(Ev)) {
                 let r = if s.is_dir() && !s.is_symlink() { std::fs::remove_dir_all(s) } else { std::fs::remove_file(s) };
                 match r {
                     Ok(()) => {
-                        crate::trash::forget(s);
+                        // удалили из корзины — её запись о файле тоже; у обычного файла рядом ничего своего нет
+                        if crate::trash::is_trashed(s) {
+                            crate::trash::forget(s);
+                        }
                         pairs.push((s.clone(), PathBuf::new()));
                     }
                     Err(e) => c.err(s, &e),
