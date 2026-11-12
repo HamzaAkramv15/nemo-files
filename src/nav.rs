@@ -188,12 +188,14 @@ impl Fm {
         let to = if c < 0 { if d > 0 { 0 } else { n - 1 } } else { (c + d).clamp(0, n - 1) };
         let to = to as usize;
         if shift {
-            let a = v.anchor.unwrap_or(c.max(0) as usize);
+            // после фильтра или перечитывания папки якорь мог остаться за концом списка
+            let a = v.anchor.unwrap_or(c.max(0) as usize).min(n as usize - 1);
             v.anchor = Some(a);
             v.sel.clear();
             for k in a.min(to)..=a.max(to) {
-                let p = v.all[v.items[k]].path.clone();
-                v.sel.insert(p);
+                if let Some(p) = v.item(k).map(|e| e.path.clone()) {
+                    v.sel.insert(p);
+                }
             }
             v.cur = Some(to);
         } else if ctrl {
@@ -202,8 +204,9 @@ impl Fm {
             v.cur = Some(to);
             v.anchor = Some(to);
             v.sel.clear();
-            let p = v.all[v.items[to]].path.clone();
-            v.sel.insert(p);
+            if let Some(p) = v.item(to).map(|e| e.path.clone()) {
+                v.sel.insert(p);
+            }
         }
         self.reveal_cursor();
     }
