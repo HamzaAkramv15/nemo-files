@@ -220,15 +220,19 @@ fn common(title: &str, o: &HashMap<String, OwnedValue>, args: &mut Vec<String>) 
     if let Some(f) = opt_path(o, "current_folder") {
         args.extend(["--folder".into(), f]);
     }
-    let filters = opt_filters(o, "filters");
+    let mut filters = opt_filters(o, "filters");
     let cur = opt_filter(o, "current_filter");
     for f in &filters {
         args.extend(["--filter".into(), filter_arg(f)]);
     }
-    if let Some(c) = &cur {
-        match filters.iter().position(|f| f == c) {
+    if let Some(c) = cur {
+        match filters.iter().position(|f| *f == c) {
             Some(i) => args.extend(["--current-filter".into(), i.to_string()]),
-            None if filters.is_empty() => args.extend(["--filter".into(), filter_arg(c)]),
+            // только он, без списка: в окне он один, и в ответе тоже он (номер 0 — этот список)
+            None if filters.is_empty() => {
+                args.extend(["--filter".into(), filter_arg(&c)]);
+                filters.push(c);
+            }
             None => {}
         }
     }
