@@ -224,9 +224,15 @@ impl Fm {
             let (err, open) = match out {
                 Ok(o) if o.status.success() => {
                     if on {
-                        // «Mounted /dev/sdb1 at /run/media/user/LABEL»
+                        // куда подключилось — из таблицы монтирования ядра: в сообщении «Mounted /dev/sdb1 at /run/media/user/LABEL»
+                        // метка с « at » или точкой на конце разбиралась бы неверно
                         let s = String::from_utf8_lossy(&o.stdout).to_string();
-                        let p = s.split(" at ").nth(1).map(|x| PathBuf::from(x.trim().trim_end_matches('.')));
+                        let p = mount_point(&d.dev).or_else(|| {
+                            // старые udisks2 ставят в конце точку: она часть пути, только если такой путь есть
+                            let x = s.trim().strip_prefix(&format!("Mounted {} at ", d.dev))?;
+                            let p = PathBuf::from(x);
+                            Some(if p.exists() { p } else { PathBuf::from(x.strip_suffix('.').unwrap_or(x)) })
+                        });
                         (None, p)
                     } else {
                         let ud = |a: &[&str]| std::process::Command::new("udisksctl").args(a).stdin(std::process::Stdio::null()).output();
@@ -300,4 +306,42 @@ fn sig() -> u64 {
         }
     }
     h
+}
+
+/// куда подключено устройство: первая строка /proc/self/mounts с ним (пробелы и прочее там — \040 и т. п.);
+/// устройство сравнивается по настоящему пути (/dev/dm-3 и /dev/mapper/luks-… — одно и то же)
+fn mount_point(dev: &str) -> Option<PathBuf> {
+    use std::os::unix::ffi::OsStringExt;
+    let unescape = |s: &str| -> PathBuf {
+        let b = s.as_bytes();
+        let mut out = Vec::with_capacity(b.len());
+        let mut i = 0;
+        while i < b.len() {
+            if b[i] == b'\\' && i + 3 < b.len() && b[i + 1..i + 4].iter().all(|c| (b'0'..=b'7').contains(c)) {
+                out.push((b[i + 1] - b'0') * 64 + (b[i + 2] - b'0') * 8 + (b[i + 3] - b'0'));
+                i += 4;
+            } else {
+                out.push(b[i]);
+                i += 1;
+            }
+        }
+        PathBuf::from(std::ffi::OsString::from_vec(out))
+    };
+    let want = std::fs::canonicalize(dev).unwrap_or_else(|_| PathBuf::from(dev));
+    let text = std::fs::read_to_string("/proc/self/mounts").ok()?;
+    text.lines().find_map(|l| {
+        let mut f = l.split(' ');
+        let (src, at) = (f.next()?, f.next()?);
+        let src = unescape(src);
+        (std::fs::canonicalize(&src).unwrap_or(src) == want).then(|| unescape(at))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn mount_point_of_root() {
+        // корень есть всегда; у несуществующего устройства — ничего
+        assert!(super::mount_point("/dev/nonexistent-yami").is_none());
+    }
 }
