@@ -308,40 +308,49 @@ fn sig() -> u64 {
     h
 }
 
-/// куда подключено устройство: первая строка /proc/self/mounts с ним (пробелы и прочее там — \040 и т. п.);
+/// поле /proc/self/mounts: пробел, таб, перевод строки и «\» ядро пишет как \040 \011 \012 \134
+fn unoctal(s: &str) -> PathBuf {
+    use std::os::unix::ffi::OsStringExt;
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        // \000…\377 — один байт; что больше (\4xx…) — не код, остаётся как есть
+        if b[i] == b'\\' && i + 3 < b.len() && (b'0'..=b'3').contains(&b[i + 1]) && b[i + 2..i + 4].iter().all(|c| (b'0'..=b'7').contains(c)) {
+            out.push((b[i + 1] - b'0') * 64 + (b[i + 2] - b'0') * 8 + (b[i + 3] - b'0'));
+            i += 4;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    PathBuf::from(std::ffi::OsString::from_vec(out))
+}
+
+/// куда подключено устройство: первая строка /proc/self/mounts с ним;
 /// устройство сравнивается по настоящему пути (/dev/dm-3 и /dev/mapper/luks-… — одно и то же)
 fn mount_point(dev: &str) -> Option<PathBuf> {
-    use std::os::unix::ffi::OsStringExt;
-    let unescape = |s: &str| -> PathBuf {
-        let b = s.as_bytes();
-        let mut out = Vec::with_capacity(b.len());
-        let mut i = 0;
-        while i < b.len() {
-            if b[i] == b'\\' && i + 3 < b.len() && b[i + 1..i + 4].iter().all(|c| (b'0'..=b'7').contains(c)) {
-                out.push((b[i + 1] - b'0') * 64 + (b[i + 2] - b'0') * 8 + (b[i + 3] - b'0'));
-                i += 4;
-            } else {
-                out.push(b[i]);
-                i += 1;
-            }
-        }
-        PathBuf::from(std::ffi::OsString::from_vec(out))
-    };
     let want = std::fs::canonicalize(dev).unwrap_or_else(|_| PathBuf::from(dev));
     let text = std::fs::read_to_string("/proc/self/mounts").ok()?;
     text.lines().find_map(|l| {
         let mut f = l.split(' ');
         let (src, at) = (f.next()?, f.next()?);
-        let src = unescape(src);
-        (std::fs::canonicalize(&src).unwrap_or(src) == want).then(|| unescape(at))
+        let src = unoctal(src);
+        (std::fs::canonicalize(&src).unwrap_or(src) == want).then(|| unoctal(at))
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     #[test]
-    fn mount_point_of_root() {
-        // корень есть всегда; у несуществующего устройства — ничего
+    fn mount_points() {
+        // метка с пробелами и « at » — та самая, что ломала разбор сообщения udisksctl
+        assert_eq!(super::unoctal(r"/run/media/u/My\040Disk\040at\040home"), Path::new("/run/media/u/My Disk at home"));
+        assert_eq!(super::unoctal(r"/mnt/a\134b\011c"), Path::new("/mnt/a\\b\tc"));
+        // не код — как есть, без переполнения
+        assert_eq!(super::unoctal(r"/mnt/\777\04"), Path::new(r"/mnt/\777\04"));
         assert!(super::mount_point("/dev/nonexistent-yami").is_none());
     }
 }

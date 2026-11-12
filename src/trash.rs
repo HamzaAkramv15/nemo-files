@@ -23,7 +23,6 @@ fn dec(s: &str) -> PathBuf {
     crate::icons::uri_path(&format!("file://{}", if s.starts_with('/') { s.to_string() } else { format!("/{s}") })).unwrap_or_else(|| PathBuf::from(s))
 }
 
-
 fn parse_stamp(s: &str) -> i64 {
     let n: Vec<i32> = s.split(|c: char| !c.is_ascii_digit()).filter(|x| !x.is_empty()).filter_map(|x| x.parse().ok()).collect();
     if n.len() < 6 {
@@ -39,7 +38,6 @@ fn parse_stamp(s: &str) -> i64 {
     tm.tm_isdst = -1;
     unsafe { libc::mktime(&mut tm) as i64 }
 }
-
 
 /// в корзину; Ok(путь в корзине)
 pub fn put(p: &Path) -> Result<PathBuf, String> {
