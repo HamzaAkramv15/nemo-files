@@ -220,11 +220,11 @@ pub fn for_dev(fm: &Fm, i: usize) -> Vec<MItem> {
             if p != std::path::Path::new("/") {
                 let eject = d.removable && d.kind != crate::places::DevKind::Net;
                 m.push(MItem::sep());
-                m.push(MItem::new(if eject { "извлечь" } else { "отключить" }, "up", "", Cmd::Unmount(i)));
+                m.push(MItem::new(if eject { "извлечь" } else { "отключить" }, "up", "", Cmd::Unmount(d.key())));
             }
         }
-        None if d.locked => m.push(MItem::new("открыть паролем…", "lock", "", Cmd::Mount(i))),
-        None => m.push(MItem::new("подключить", "down", "", Cmd::Mount(i))),
+        None if d.locked => m.push(MItem::new("открыть паролем…", "lock", "", Cmd::Mount(d.key()))),
+        None => m.push(MItem::new("подключить", "down", "", Cmd::Mount(d.key()))),
     }
     // сеть: войти под другим логином и забыть адрес
     if d.kind == crate::places::DevKind::Net && !d.uri.is_empty() {

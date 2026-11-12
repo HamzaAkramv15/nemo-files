@@ -456,11 +456,16 @@ impl App {
                 }
                 fm.side_scroll = 0;
             }
-            Act::Dev(i) => match fm.devs.get(i).and_then(|d| d.mount.clone()) {
-                Some(m) => fm.go(m),
-                None => fm.run(Cmd::Mount(i)),
+            Act::Dev(i) => match fm.devs.get(i).map(|d| (d.mount.clone(), d.key())) {
+                Some((Some(m), _)) => fm.go(m),
+                Some((None, k)) => fm.run(Cmd::Mount(k)),
+                None => {}
             },
-            Act::Eject(i) => fm.run(Cmd::Unmount(i)),
+            Act::Eject(i) => {
+                if let Some(k) = fm.devs.get(i).map(|d| d.key()) {
+                    fm.run(Cmd::Unmount(k));
+                }
+            }
             Act::Connect => fm.run(Cmd::Connect(String::new())),
             Act::DlgFocus(n) => {
                 if let Some((Dlg::Server { field, .. }, _)) = &mut fm.dlg {

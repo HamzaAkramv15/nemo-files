@@ -284,8 +284,16 @@ impl Fm {
             }
             Cmd::Split => self.toggle_split(),
             Cmd::Info => self.cfg.info = !self.cfg.info,
-            Cmd::Mount(i) => self.mount(i, true),
-            Cmd::Unmount(i) => self.mount(i, false),
+            Cmd::Mount(k) => {
+                if let Some(i) = self.devs.iter().position(|d| d.key() == k) {
+                    self.mount(i, true);
+                }
+            }
+            Cmd::Unmount(k) => {
+                if let Some(i) = self.devs.iter().position(|d| d.key() == k) {
+                    self.mount(i, false);
+                }
+            }
             Cmd::Connect(uri) => self.server_dlg(&uri, String::new(), None),
             Cmd::Forget(uri) => {
                 self.cfg.servers.retain(|s| s != &uri);
