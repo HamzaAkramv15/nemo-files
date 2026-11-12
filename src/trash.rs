@@ -1,71 +1,12 @@
 // Корзина по спецификации freedesktop: ~/.local/share/Trash для домашнего диска,
 // <точка монтирования>/.Trash-<uid> для остальных. Общая с Dolphin, Nautilus, gio trash.
+// Положить в неё и проверки корзины на чужом диске — yami_px::trash (то же у yami-view); здесь —
+// список, возврат, очистка.
 
 use crate::fsx::Entry;
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-
-fn uid() -> u32 {
-    unsafe { libc::getuid() }
-}
-
-pub fn home_trash() -> PathBuf {
-    crate::paths::data_dir().join("Trash")
-}
-
-/// точка монтирования, на которой лежит p
-fn topdir(p: &Path) -> Option<PathBuf> {
-    let dev = std::fs::symlink_metadata(p).ok()?.dev();
-    let mut cur = p.to_path_buf();
-    loop {
-        let parent = cur.parent()?.to_path_buf();
-        if std::fs::metadata(&parent).ok()?.dev() != dev {
-            return Some(cur);
-        }
-        if parent == Path::new("/") {
-            return Some(parent);
-        }
-        cur = parent;
-    }
-}
-
-/// настоящая папка (не ссылка) и наша
-fn own_dir(d: &Path) -> bool {
-    std::fs::symlink_metadata(d).is_ok_and(|m| m.is_dir() && m.uid() == uid())
-}
-
-/// корзина на чужом диске — настоящая: сама .Trash-<uid> и её files — наши папки, не ссылки; info —
-/// тоже, если есть. Диск приносят со стороны: files, сделанная ссылкой на /home, показала бы домашние
-/// папки «файлами в корзине», и «очистить корзину» удалила бы их на самом деле. Та же проверка у glib
-fn real_trash(t: &Path) -> bool {
-    let info = t.join("info");
-    own_dir(t) && own_dir(&t.join("files")) && (std::fs::symlink_metadata(&info).is_err() || own_dir(&info))
-}
-
-fn trash_for(p: &Path) -> Option<(PathBuf, Option<PathBuf>)> {
-    let ht = home_trash();
-    let _ = std::fs::create_dir_all(&ht);
-    let hdev = std::fs::metadata(crate::paths::data_dir()).ok()?.dev();
-    let pdev = std::fs::symlink_metadata(p).ok()?.dev();
-    if hdev == pdev {
-        return Some((ht, None));
-    }
-    let top = topdir(p)?;
-    let t = top.join(format!(".Trash-{}", uid()));
-    // под этим именем уже что-то не наше (ссылка, чужая папка): туда не кладём и ничего там не создаём
-    if std::fs::symlink_metadata(&t).is_ok() && !own_dir(&t) {
-        return None;
-    }
-    // своя корзина на общем диске — только своя (0700, как велит спецификация): удалённое не читают другие
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        let _ = std::fs::DirBuilder::new().mode(0o700).create(&t);
-    }
-    if std::fs::create_dir_all(t.join("files")).is_ok() && std::fs::create_dir_all(t.join("info")).is_ok() && real_trash(&t) {
-        return Some((t, Some(top)));
-    }
-    None
-}
+pub use yami_px::trash::home_trash;
+use yami_px::trash::{real_trash, uid};
 
 /// откуда удалён файл по строке «Path=» его .trashinfo. Домашняя корзина (top нет) — путь как записан.
 /// Корзина на чужом диске — только место на этом же диске: путь относительно его корня и не выше его
@@ -78,29 +19,10 @@ fn orig_of(top: Option<&Path>, v: &str) -> Option<PathBuf> {
     (rel.components().next().is_some() && rel.components().all(|c| matches!(c, std::path::Component::Normal(_)))).then(|| top.join(rel))
 }
 
-fn enc(s: &str) -> String {
-    let mut o = String::new();
-    for b in s.bytes() {
-        if b.is_ascii_alphanumeric() || b"/-_.~".contains(&b) {
-            o.push(b as char);
-        } else {
-            o.push_str(&format!("%{b:02X}"));
-        }
-    }
-    o
-}
-
 fn dec(s: &str) -> PathBuf {
     crate::icons::uri_path(&format!("file://{}", if s.starts_with('/') { s.to_string() } else { format!("/{s}") })).unwrap_or_else(|| PathBuf::from(s))
 }
 
-fn stamp() -> String {
-    let t = crate::fsx::local_tm(crate::fsx::now());
-    let mut s: libc::tm = unsafe { std::mem::zeroed() };
-    let now = crate::fsx::now() as _;
-    unsafe { libc::localtime_r(&now, &mut s) };
-    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}", t.year, t.mon, t.day, t.hour, t.min, s.tm_sec)
-}
 
 fn parse_stamp(s: &str) -> i64 {
     let n: Vec<i32> = s.split(|c: char| !c.is_ascii_digit()).filter(|x| !x.is_empty()).filter_map(|x| x.parse().ok()).collect();
@@ -118,46 +40,13 @@ fn parse_stamp(s: &str) -> i64 {
     unsafe { libc::mktime(&mut tm) as i64 }
 }
 
+
 /// в корзину; Ok(путь в корзине)
 pub fn put(p: &Path) -> Result<PathBuf, String> {
-    let (t, top) = trash_for(p).ok_or_else(|| crate::i18n::tr("корзина недоступна").to_string())?;
-    let files = t.join("files");
-    let info = t.join("info");
-    let _ = std::fs::create_dir_all(&files);
-    let _ = std::fs::create_dir_all(&info);
-    let name = p.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
-    // имя в корзине: занятое — «имя (2)»; .trashinfo создаётся первым и атомарно (O_EXCL)
-    let mut target = files.join(&name);
-    let mut n = 1;
-    let infofile = loop {
-        let tn = target.file_name().unwrap().to_string_lossy().to_string();
-        let ip = info.join(format!("{tn}.trashinfo"));
-        match std::fs::OpenOptions::new().write(true).create_new(true).open(&ip) {
-            Ok(mut f) => {
-                use std::io::Write;
-                let shown = match &top {
-                    Some(top) => p.strip_prefix(top).map(|r| r.to_string_lossy().to_string()).unwrap_or_else(|_| p.to_string_lossy().to_string()),
-                    None => p.to_string_lossy().to_string(),
-                };
-                let _ = write!(f, "[Trash Info]\nPath={}\nDeletionDate={}\n", enc(&shown), stamp());
-                break ip;
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                n += 1;
-                let (stem, ext) = match name.rfind('.') {
-                    Some(i) if i > 0 => (&name[..i], &name[i..]),
-                    _ => (name.as_str(), ""),
-                };
-                target = files.join(format!("{stem} ({n}){ext}"));
-            }
-            Err(e) => return Err(crate::fsx::err_text(&e)),
-        }
-    };
-    if let Err(e) = std::fs::rename(p, &target) {
-        let _ = std::fs::remove_file(&infofile);
-        return Err(crate::fsx::err_text(&e));
-    }
-    Ok(target)
+    yami_px::trash::put(p).map_err(|e| match e {
+        yami_px::trash::PutErr::NoTrash => crate::i18n::tr("корзина недоступна").to_string(),
+        yami_px::trash::PutErr::Io(e) => crate::fsx::err_text(&e),
+    })
 }
 
 /// файловая система диска (своя корзина .Trash-UID бывает только у таких)
@@ -244,52 +133,8 @@ pub fn all_files() -> Vec<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{orig_of, real_trash};
+    use super::orig_of;
     use std::path::Path;
-
-    /// корзина на принесённом диске, собранная из ссылок, — не корзина: то, на что она указывает, не
-    /// показывается «файлами в корзине» и не удаляется её очисткой
-    #[test]
-    fn a_trash_made_of_links_is_not_a_trash() {
-        let d = crate::paths::private_tmp("trash-test").unwrap();
-        let home = d.join("home");
-        std::fs::create_dir_all(home.join("alice/Documents")).unwrap();
-        let mk = |disk: &str| {
-            let t = d.join(disk).join(".Trash-1000");
-            std::fs::create_dir_all(&t).unwrap();
-            t
-        };
-        // как её делает любой файловый менеджер
-        let good = mk("good");
-        std::fs::create_dir_all(good.join("files")).unwrap();
-        std::fs::create_dir_all(good.join("info")).unwrap();
-        assert!(real_trash(&good));
-        // без info (ещё ничего не удаляли) — тоже корзина
-        let fresh = mk("fresh");
-        std::fs::create_dir_all(fresh.join("files")).unwrap();
-        assert!(real_trash(&fresh));
-        // files — ссылка на /home: «в корзине» оказались бы домашние папки
-        let bait = mk("bait");
-        std::fs::create_dir_all(bait.join("info")).unwrap();
-        std::os::unix::fs::symlink(&home, bait.join("files")).unwrap();
-        assert!(bait.join("files/alice").is_dir(), "the link does lead to the home folders");
-        assert!(!real_trash(&bait));
-        // сама .Trash-<uid> — ссылка
-        std::fs::create_dir_all(d.join("linked")).unwrap();
-        std::os::unix::fs::symlink(&good, d.join("linked/.Trash-1000")).unwrap();
-        assert!(!real_trash(&d.join("linked/.Trash-1000")));
-        // info — ссылка
-        let info = mk("info");
-        std::fs::create_dir_all(info.join("files")).unwrap();
-        std::os::unix::fs::symlink(&home, info.join("info")).unwrap();
-        assert!(!real_trash(&info));
-        // файл вместо папки, и вовсе ничего
-        let file = mk("file");
-        std::fs::write(file.join("files"), b"").unwrap();
-        assert!(!real_trash(&file) && !real_trash(&d.join("nothing/.Trash-1000")));
-        assert!(home.join("alice/Documents").is_dir());
-        let _ = std::fs::remove_dir_all(&d);
-    }
 
     /// .trashinfo с чужого диска возвращает файл только на этот диск
     #[test]
