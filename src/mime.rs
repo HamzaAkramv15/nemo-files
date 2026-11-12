@@ -98,8 +98,26 @@ pub fn guess(name: &str, path: &Path, mode: u32) -> &'static str {
 
 fn sniff(path: &Path, mode: u32) -> &'static str {
     use std::io::Read;
+    use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
+    // читаются только обычные файлы: открыть канал (FIFO) — ждать писателя вечно, устройство в /dev —
+    // включить камеру или сбросить плату на последовательном порту
+    let Ok(md) = std::fs::metadata(path) else { return "application/octet-stream" };
+    let ft = md.file_type();
+    if !ft.is_file() {
+        return if ft.is_fifo() {
+            "inode/fifo"
+        } else if ft.is_char_device() {
+            "inode/chardevice"
+        } else if ft.is_block_device() {
+            "inode/blockdevice"
+        } else if ft.is_socket() {
+            "inode/socket"
+        } else {
+            "application/octet-stream"
+        };
+    }
     let mut b = [0u8; 512];
-    let n = std::fs::File::open(path).and_then(|mut f| f.read(&mut b)).unwrap_or(0);
+    let n = std::fs::OpenOptions::new().read(true).custom_flags(libc::O_NONBLOCK).open(path).and_then(|mut f| f.read(&mut b)).unwrap_or(0);
     let b = &b[..n];
     if n == 0 {
         return if mode & 0o170000 == 0o100000 { "application/x-zerosize" } else { "application/octet-stream" };

@@ -222,6 +222,20 @@ fn copy_tree(c: &mut Ctx, src: &Path, dst: &Path) {
             }
         }
         let _ = std::fs::set_permissions(dst, m.permissions());
+    } else if !m.is_file() {
+        // канал (FIFO) — новый такой же, а не чтение из него (оно ждало бы писателя вечно, и отмена
+        // не помогла бы); устройство или сокет не копируются — их содержимое не файл
+        use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+        if m.file_type().is_fifo() {
+            use std::os::unix::ffi::OsStrExt;
+            // SAFETY: mkfifo с путём, оканчивающимся нулём (CString)
+            let made = std::ffi::CString::new(dst.as_os_str().as_bytes()).is_ok_and(|p| unsafe { libc::mkfifo(p.as_ptr(), m.permissions().mode() & 0o7777) } == 0);
+            if !made {
+                c.err(src, &std::io::Error::last_os_error());
+            }
+        } else {
+            c.err(src, &std::io::Error::from(std::io::ErrorKind::Unsupported));
+        }
     } else if let Err(e) = copy_file(c, src, dst) {
         c.err(src, &e);
     }
