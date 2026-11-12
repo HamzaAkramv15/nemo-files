@@ -289,6 +289,10 @@ pub fn run(fm_init: impl FnOnce(Option<calloop::channel::Sender<Msg>>) -> Fm) ->
 
 impl App {
     pub(crate) fn tick(&mut self) {
+        // окно закрыли — следующее из очереди заданий
+        if self.fm.next_dlg() {
+            self.dirty = true;
+        }
         // вид поменялся — новые цвета, язык
         if self.fm.look.stale() {
             let font = self.fm.look.font("files").to_string();

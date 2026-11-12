@@ -392,6 +392,8 @@ pub struct Fm {
     pub worker: Option<crate::thumbs::Thumbs>,
     pub menu: Option<Menu>,
     pub dlg: Option<(Dlg, Instant)>,
+    /// окна, пришедшие от заданий, пока было открыто другое (вопрос о совпадении имён, ошибки): по очереди
+    pub dlg_wait: Vec<Dlg>,
     pub jobs: Vec<Job>,
     pub undo: Vec<Undo>,
     pub path_f: Field,
@@ -480,6 +482,7 @@ impl Fm {
             worker: None,
             menu: None,
             dlg: None,
+            dlg_wait: vec![],
             jobs: vec![],
             undo: vec![],
             path_f: Field::default(),

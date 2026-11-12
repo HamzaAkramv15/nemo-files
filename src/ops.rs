@@ -29,8 +29,9 @@ pub enum Resolve {
 pub enum Ev {
     Progress { id: u32, done: u64, total: u64, name: String },
     Conflict { src: PathBuf, dst: PathBuf, reply: mpsc::Sender<(Resolve, bool)> },
-    /// pairs: (откуда, куда) — для отмены и подсветки нового
-    Done { id: u32, kind: Kind, errors: Vec<String>, pairs: Vec<(PathBuf, PathBuf)> },
+    /// pairs: (откуда, куда) — для отмены и подсветки нового; merged — папки, слитые с уже бывшими там
+    /// («заменить» папку папкой): отмена не трогает их, в них лежало и чужое
+    Done { id: u32, kind: Kind, errors: Vec<String>, pairs: Vec<(PathBuf, PathBuf)>, merged: Vec<PathBuf> },
 }
 
 pub struct Job {
@@ -244,6 +245,7 @@ fn copy_tree(c: &mut Ctx, src: &Path, dst: &Path) {
 fn run(job: Job, send: &dyn Fn(Ev)) {
     let mut c = Ctx { id: job.id, send, done: 0, total: 0, last: Instant::now(), stop: job.stop.clone(), all: None, errors: vec![] };
     let mut pairs: Vec<(PathBuf, PathBuf)> = vec![];
+    let mut merged: Vec<PathBuf> = vec![];
     match job.kind {
         Kind::Copy | Kind::Move => {
             c.total = job.srcs.iter().map(|s| size_of(s)).sum();
@@ -275,6 +277,9 @@ fn run(job: Job, send: &dyn Fn(Ev)) {
                     }
                 }
                 let before = c.errors.len();
+                if s.is_dir() && !s.is_symlink() && std::fs::symlink_metadata(&d).is_ok_and(|m| m.is_dir()) {
+                    merged.push(d.clone());
+                }
                 copy_tree(&mut c, s, &d);
                 if c.stopped() {
                     break;
@@ -389,7 +394,7 @@ fn run(job: Job, send: &dyn Fn(Ev)) {
         }
     }
     c.tick("", true);
-    send(Ev::Done { id: job.id, kind: job.kind, errors: c.errors, pairs });
+    send(Ev::Done { id: job.id, kind: job.kind, errors: c.errors, pairs, merged });
 }
 
 #[cfg(test)]

@@ -358,19 +358,22 @@ impl Fm {
                     j.name = name;
                 }
             }
-            ops::Ev::Conflict { src, dst, reply } => {
-                self.dlg = Some((Dlg::Conflict { src, dst, all: false, reply }, Instant::now()));
-            }
-            ops::Ev::Done { id, kind, errors, pairs } => {
+            // поверх открытого окна — в очередь: заменить его значило бы бросить чужой ответ (задание
+            // встало бы как отменённое) или окно сервера с набранным паролем
+            ops::Ev::Conflict { src, dst, reply } => self.show_dlg(Dlg::Conflict { src, dst, all: false, reply }),
+            ops::Ev::Done { id, kind, errors, pairs, merged } => {
                 self.jobs.retain(|j| j.id != id);
                 let made: Vec<PathBuf> = pairs.iter().map(|p| p.1.clone()).filter(|p| !p.as_os_str().is_empty()).collect();
+                // отмена не трогает слитые папки: в них лежало и то, что было там до задания
+                let undo_made: Vec<PathBuf> = made.iter().filter(|p| !merged.contains(p)).cloned().collect();
+                let undo_moved: Vec<(PathBuf, PathBuf)> = pairs.iter().filter(|p| !merged.contains(&p.1)).cloned().collect();
                 match kind {
-                    ops::Kind::Move if !pairs.is_empty() => self.undo.push(Undo::Moved(pairs.clone())),
+                    ops::Kind::Move if !undo_moved.is_empty() => self.undo.push(Undo::Moved(undo_moved)),
                     ops::Kind::Trash if !pairs.is_empty() => {
                         self.undo.push(Undo::Trashed(pairs.clone()));
                         self.toast(crate::tf!("в корзине: {} · ctrl+z — вернуть", "moved to trash: {} · ctrl+z to undo", "movido para a lixeira: {} · ctrl+z para desfazer", pairs.len()));
                     }
-                    ops::Kind::Copy | ops::Kind::Link | ops::Kind::Extract | ops::Kind::Compress if !made.is_empty() => self.undo.push(Undo::Created(made.clone())),
+                    ops::Kind::Copy | ops::Kind::Link | ops::Kind::Extract | ops::Kind::Compress if !undo_made.is_empty() => self.undo.push(Undo::Created(undo_made)),
                     ops::Kind::Delete if !pairs.is_empty() => self.toast(crate::tf!("удалено: {}", "deleted: {}", "excluído: {}", pairs.len())),
                     ops::Kind::Restore if !pairs.is_empty() => self.toast(crate::tf!("возвращено: {}", "restored: {}", "restaurado: {}", pairs.len())),
                     _ => {}
@@ -391,7 +394,7 @@ impl Fm {
                     }
                 }
                 if !errors.is_empty() {
-                    self.dlg = Some((Dlg::Errors(errors), Instant::now()));
+                    self.show_dlg(Dlg::Errors(errors));
                 }
                 let mut dirs: Vec<PathBuf> = vec![];
                 for (a, b) in &pairs {
@@ -417,6 +420,25 @@ impl Fm {
         }
     }
 
+    /// окно от задания: сразу, если других нет, иначе — когда закроют текущее (next_dlg)
+    pub fn show_dlg(&mut self, d: Dlg) {
+        if self.dlg.is_none() {
+            self.dlg = Some((d, Instant::now()));
+        } else {
+            self.dlg_wait.push(d);
+        }
+    }
+
+    /// окно закрыли, а в очереди есть следующее: показать его; true — показали
+    pub fn next_dlg(&mut self) -> bool {
+        if self.dlg.is_some() || self.dlg_wait.is_empty() {
+            return false;
+        }
+        let d = self.dlg_wait.remove(0);
+        self.dlg = Some((d, Instant::now()));
+        true
+    }
+
     pub fn conflict_answer(&mut self, r: ops::Resolve) {
         if let Some((Dlg::Conflict { reply, all, .. }, _)) = self.dlg.take() {
             let _ = reply.send((r, all));
@@ -430,14 +452,24 @@ impl Fm {
         };
         match u {
             Undo::Moved(pairs) => {
+                let mut kept = 0;
                 for (a, b) in pairs.iter().rev() {
+                    // на старом месте уже что-то есть (создали заново): не затирать его
+                    if std::fs::symlink_metadata(a).is_ok() {
+                        kept += 1;
+                        continue;
+                    }
                     if std::fs::rename(b, a).is_err() {
                         if let Some(d) = a.parent() {
                             self.job(ops::Kind::Move, vec![b.clone()], d.to_path_buf(), String::new());
                         }
                     }
                 }
-                self.toast(crate::i18n::tr("перенос отменён"));
+                if kept > 0 {
+                    self.toast(crate::tf!("не возвращено: {} — на старом месте уже есть файл с тем же именем", "not moved back: {}: something with the same name is there again", "não devolvido: {}: já existe algo com o mesmo nome lá", kept));
+                } else {
+                    self.toast(crate::i18n::tr("перенос отменён"));
+                }
             }
             Undo::Trashed(pairs) => {
                 let mut n = 0;
@@ -453,7 +485,11 @@ impl Fm {
                 self.job(ops::Kind::Trash, paths, PathBuf::new(), String::new());
             }
             Undo::Renamed(a, b) => {
-                if std::fs::rename(&b, &a).is_ok() {
+                // на старом имени уже что-то есть (то же самое, если менялся только регистр на vfat — тогда можно)
+                let ino = |p: &PathBuf| std::fs::symlink_metadata(p).ok().map(|m| { use std::os::unix::fs::MetadataExt; (m.dev(), m.ino()) });
+                if ino(&a).is_some() && ino(&a) != ino(&b) {
+                    self.toast(crate::tf!("имя не возвращено: файл с прежним именем уже есть", "the name was not put back: a file with the old name is there again", "o nome não foi devolvido: já existe um arquivo com o nome antigo"));
+                } else if std::fs::rename(&b, &a).is_ok() {
                     self.vm().pending_sel = vec![a];
                     self.toast(crate::i18n::tr("имя возвращено"));
                 }
