@@ -93,6 +93,31 @@ fn pick_from_args(args: &[String]) -> (fm::Pick, Vec<PathBuf>) {
     (p, dirs)
 }
 
+/// выбранное — на stdout. Строками (шелл, yami-shot): имя с переводом строки так не передать — оно
+/// пропускается, иначе подсунуло бы лишний путь. С --null (портал): номер выбранного фильтра, потом
+/// пути байтами как есть, каждое поле — с \0 в конце
+fn put_picked(v: &[PathBuf], filter: usize, null: bool) {
+    use std::io::Write;
+    use std::os::unix::ffi::OsStrExt;
+    let mut o = std::io::stdout().lock();
+    if null {
+        let _ = write!(o, "{filter}\0");
+        for p in v {
+            let _ = o.write_all(p.as_os_str().as_bytes());
+            let _ = o.write_all(b"\0");
+        }
+    } else {
+        for p in v {
+            if p.as_os_str().as_bytes().contains(&b'\n') {
+                eprintln!("yami-files: {p:?} has a line break in its name, left out");
+                continue;
+            }
+            let _ = writeln!(o, "{}", p.display());
+        }
+    }
+    let _ = o.flush();
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if let Some(c) = yami_px::install::dispatch(&setup::SPEC, &args[1..]) {
@@ -104,7 +129,7 @@ fn main() {
             return;
         }
         Some("-h") | Some("--help") => {
-            println!("yami-files [DIR…] | install | uninstall | deps | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… | --portal | --portal-reload | shot [TARGET…] [--lang en] [-o DIR]");
+            println!("yami-files [DIR…] | install | uninstall | deps | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… [--null] | --portal | --portal-reload | shot [TARGET…] [--lang en] [-o DIR]");
             return;
         }
         Some("shot") => std::process::exit(shot::run(&args[2..])),
@@ -120,6 +145,7 @@ fn main() {
     // кеш миниатюр (общий с выбором обоев) — раз в сутки, не мешая открытию окна
     std::thread::spawn(icons::thumbs_tidy);
     if args.get(1).map(|s| s == "--pick").unwrap_or(false) {
+        let null = args[2..].iter().any(|a| a == "--null");
         let (pick, dirs) = pick_from_args(&args[2..]);
         let dirs: Vec<PathBuf> = dirs.into_iter().filter(|d| d.is_dir()).collect();
         // папка не задана: где выбирали в прошлый раз, для сохранения — загрузки
@@ -139,13 +165,12 @@ fn main() {
             f.refilter_all();
             f
         });
+        let filter = fm.pick.as_ref().map_or(0, |p| p.filter);
         match fm.pick.as_ref().and_then(|p| p.done.clone()) {
             Some(v) if !v.is_empty() => {
                 let dir = if v[0].is_dir() && !fm.tabs.is_empty() && v.len() == 1 && v[0].parent().is_some() { v[0].clone() } else { v[0].parent().map(|d| d.to_path_buf()).unwrap_or_default() };
                 let _ = std::fs::write(&last, dir.to_string_lossy().as_bytes());
-                for p in v {
-                    println!("{}", p.display());
-                }
+                put_picked(&v, filter, null);
                 std::process::exit(0);
             }
             _ => std::process::exit(1),

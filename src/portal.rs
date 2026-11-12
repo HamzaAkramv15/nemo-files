@@ -188,19 +188,24 @@ pub fn reload() -> i32 {
     1
 }
 
-/// запустить диалог и дождаться ответа; None — отменили
-fn pick(args: Vec<String>) -> Option<Vec<String>> {
+/// запустить диалог и дождаться ответа: адреса выбранного и номер фильтра, на котором выбрали; None — отменили.
+/// Ответ — через \0 (--null): имя файла с переводом строки не превратится в лишний путь
+fn pick(mut args: Vec<String>) -> Option<(Vec<String>, usize)> {
+    use std::os::unix::ffi::OsStrExt;
     let _busy = Busy::take();
     let exe = exe()?;
+    args.push("--null".into());
     let out = std::process::Command::new(exe).arg("--pick").args(&args).stdin(std::process::Stdio::null()).stderr(std::process::Stdio::inherit()).output().ok()?;
     if !out.status.success() {
         return None;
     }
-    let v: Vec<String> = String::from_utf8_lossy(&out.stdout).lines().filter(|l| !l.is_empty()).map(|l| crate::icons::file_uri(std::path::Path::new(l))).collect();
+    let mut parts = out.stdout.split(|&b| b == 0);
+    let filter = parts.next().and_then(|f| std::str::from_utf8(f).ok()).and_then(|f| f.parse().ok()).unwrap_or(0);
+    let v: Vec<String> = parts.filter(|p| !p.is_empty()).map(|p| crate::icons::file_uri(std::path::Path::new(std::ffi::OsStr::from_bytes(p)))).collect();
     if v.is_empty() {
         None
     } else {
-        Some(v)
+        Some((v, filter))
     }
 }
 
@@ -230,14 +235,15 @@ fn common(title: &str, o: &HashMap<String, OwnedValue>, args: &mut Vec<String>) 
     filters
 }
 
-fn reply(uris: Option<Vec<String>>, filters: &[Filter]) -> (u32, HashMap<String, OwnedValue>) {
+/// ответ портала; current_filter — тот, на котором выбрали (его номер дал диалог)
+fn reply(picked: Option<(Vec<String>, usize)>, filters: &[Filter]) -> (u32, HashMap<String, OwnedValue>) {
     let mut r: HashMap<String, OwnedValue> = HashMap::new();
-    match uris {
-        Some(u) => {
+    match picked {
+        Some((u, chosen)) => {
             if let Ok(v) = OwnedValue::try_from(Value::from(u)) {
                 r.insert("uris".into(), v);
             }
-            if let Some(f) = filters.first() {
+            if let Some(f) = filters.get(chosen).or(filters.first()) {
                 if let Ok(v) = OwnedValue::try_from(Value::from(f.clone())) {
                     r.insert("current_filter".into(), v);
                 }
@@ -286,7 +292,7 @@ impl Chooser {
         common(title, &options, &mut args);
         let files: Vec<Vec<u8>> = options.get("files").and_then(|v| v.try_clone().ok()).and_then(|v| Vec::<Vec<u8>>::try_from(v).ok()).unwrap_or_default();
         let r = blocking::unblock(move || pick(args)).await;
-        let uris = r.and_then(|d| crate::icons::uri_path(&d[0])).map(|dir| {
+        let uris = r.and_then(|(d, _)| crate::icons::uri_path(&d[0])).map(|dir| {
             // не больше 1000 имён; пустое после очистки — «file»
             files.iter().take(1000).map(|f| {
                 let n: Vec<u8> = f.iter().copied().take_while(|&c| c != 0).collect();
@@ -294,7 +300,7 @@ impl Chooser {
                 crate::icons::file_uri(&crate::fsx::free_name(&dir, if n.is_empty() { "file" } else { &n }))
             }).collect::<Vec<String>>()
         });
-        reply(uris, &[])
+        reply(uris.map(|u| (u, 0)), &[])
     }
 }
 
