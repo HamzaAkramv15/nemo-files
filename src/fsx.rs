@@ -275,10 +275,10 @@ pub fn free_name(dir: &Path, name: &str) -> PathBuf {
     if std::fs::symlink_metadata(&p).is_err() {
         return p;
     }
-    let (stem, ext) = match name.rfind('.') {
-        Some(i) if i > 0 => (&name[..i], &name[i..]),
-        _ => (name, ""),
-    };
+    // «.tar.gz» и родня — одно расширение: «a (2).tar.gz», а не «a.tar (2).gz»
+    let cut = stem_len(name, false);
+    let cut = name.char_indices().nth(cut).map_or(name.len(), |(i, _)| i);
+    let (stem, ext) = name.split_at(cut);
     // уже «(n)» на конце — продолжаем счёт
     let base = match stem.rfind(" (") {
         Some(i) if stem.ends_with(')') && stem[i + 2..stem.len() - 1].parse::<u32>().is_ok() => &stem[..i],
@@ -318,3 +318,40 @@ pub fn du(p: &Path, stop: &std::sync::atomic::AtomicBool) -> (u64, u64, u64) {
     }
     (bytes, files, dirs)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dir_with(names: &[&str]) -> PathBuf {
+        let dir = yami_px::paths::private_tmp("fsx-test").expect("tmp");
+        for n in names {
+            std::fs::write(dir.join(n), b"x").unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn free_names_count_on_and_keep_the_whole_extension() {
+        let d = dir_with(&["a.txt", "a (2).txt", "b.tar.gz", "noext", ".hidden", "c (7).png"]);
+        let n = |x: &str| free_name(&d, x).file_name().unwrap().to_string_lossy().to_string();
+        assert_eq!(n("fresh.txt"), "fresh.txt");
+        assert_eq!(n("a.txt"), "a (3).txt", "continues after (2)");
+        assert_eq!(n("b.tar.gz"), "b (2).tar.gz", "tar.gz is one extension");
+        assert_eq!(n("noext"), "noext (2)");
+        assert_eq!(n(".hidden"), ".hidden (2)", "a dot file has no extension");
+        assert_eq!(n("c (7).png"), "c (2).png", "the first free number, not one past the old one");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn stems_cut_at_the_right_dot() {
+        assert_eq!(stem_len("photo.jpg", false), 5);
+        assert_eq!(stem_len("a.tar.gz", false), 1);
+        assert_eq!(stem_len("A.TAR.XZ", false), 1);
+        assert_eq!(stem_len(".bashrc", false), 7);
+        assert_eq!(stem_len("v1.2.dir", true), 8);
+        assert_eq!(stem_len("снимок.png", false), 6, "counted in characters, not bytes");
+    }
+}
+

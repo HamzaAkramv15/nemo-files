@@ -119,6 +119,18 @@ impl Ctx<'_> {
     }
 }
 
+/// кладут ли папку внутрь неё самой: по настоящим путям, чтобы ссылка на папку не обманула проверку
+/// (иначе копирование шло бы, пока путь не станет слишком длинным)
+fn into_itself(src: &Path, dst: &Path) -> bool {
+    if !src.is_dir() {
+        return false;
+    }
+    match (std::fs::canonicalize(src), std::fs::canonicalize(dst)) {
+        (Ok(s), Ok(d)) => d.starts_with(s),
+        _ => dst.starts_with(src),
+    }
+}
+
 fn same(a: &Path, b: &Path) -> bool {
     match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
         (Ok(x), Ok(y)) => x == y,
@@ -254,7 +266,7 @@ fn run(job: Job, send: &dyn Fn(Ev)) {
                 if c.stopped() {
                     break;
                 }
-                if job.dst.starts_with(s) && s.is_dir() {
+                if into_itself(s, &job.dst) {
                     c.errors.push(crate::tf!("{}: нельзя положить папку в саму себя", "{}: cannot put a folder inside itself", "{}: não é possível colocar uma pasta dentro dela mesma", s.display()));
                     continue;
                 }
@@ -428,6 +440,48 @@ mod tests {
         let mut c = ctx(&send);
         copy_file(&mut c, Path::new("/proc/self/status"), &to).unwrap();
         assert!(std::fs::read_to_string(&to).unwrap().contains("Name:"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_folder_cannot_go_into_itself_even_through_a_link() {
+        let dir = yami_px::paths::private_tmp("ops-self").expect("tmp");
+        let a = dir.join("a");
+        std::fs::create_dir_all(a.join("sub")).unwrap();
+        let link = dir.join("link");
+        std::os::unix::fs::symlink(&a, &link).unwrap();
+        assert!(into_itself(&a, &a));
+        assert!(into_itself(&a, &a.join("sub")));
+        assert!(into_itself(&a, &link.join("sub")), "a link to the folder is the folder");
+        assert!(!into_itself(&a, &dir));
+        // файл — не папка; сосед с общим началом имени — не внутри
+        std::fs::write(dir.join("f"), b"x").unwrap();
+        assert!(!into_itself(&dir.join("f"), &dir));
+        std::fs::create_dir(dir.join("ab")).unwrap();
+        assert!(!into_itself(&a, &dir.join("ab")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// копия папки с вложенным, ссылкой, пустым файлом и каналом; права сохраняются
+    #[test]
+    fn copy_tree_keeps_structure_links_and_modes() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = yami_px::paths::private_tmp("ops-tree").expect("tmp");
+        let src = dir.join("src");
+        std::fs::create_dir_all(src.join("d/e")).unwrap();
+        std::fs::write(src.join("d/e/f.txt"), b"hello").unwrap();
+        std::fs::write(src.join("empty"), b"").unwrap();
+        std::os::unix::fs::symlink("d/e/f.txt", src.join("ln")).unwrap();
+        std::fs::set_permissions(src.join("d/e/f.txt"), std::fs::Permissions::from_mode(0o640)).unwrap();
+        let send = |_: Ev| {};
+        let mut c = ctx(&send);
+        let dst = dir.join("dst");
+        copy_tree(&mut c, &src, &dst);
+        assert!(c.errors.is_empty(), "{:?}", c.errors);
+        assert_eq!(std::fs::read(dst.join("d/e/f.txt")).unwrap(), b"hello");
+        assert_eq!(std::fs::metadata(dst.join("d/e/f.txt")).unwrap().permissions().mode() & 0o777, 0o640);
+        assert!(std::fs::metadata(dst.join("empty")).unwrap().len() == 0);
+        assert_eq!(std::fs::read_link(dst.join("ln")).unwrap(), Path::new("d/e/f.txt"), "the link stays a link");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
