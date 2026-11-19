@@ -21,10 +21,12 @@ Tests were 6; they are now 10.
 2. The "folder into itself" guard compared raw paths, so copying `/a` into `/link-to-a/sub` was not caught and would recurse until
    the path got too long. It now compares real paths.
 
+3. **Replace is now safe for files.** The copy goes to a hidden temporary name beside the target and only a complete copy is
+   renamed over the old file (one atomic `rename`, same disk); a failed or cancelled copy removes the temporary and leaves the old
+   file untouched. Folders still merge as before.
+
 ## Known, not changed (decisions for later)
 
-- **Replace deletes the destination before copying.** If the copy then fails, the old file is gone and the source remains. Safer:
-  copy to a temporary name, then rename over the destination. Worth doing with the undo work.
 - A symlink to a folder counts as a folder in the "into itself" check (harmless: it only blocks a copy that makes no sense).
 - `Compress` with sources outside the destination folder passes absolute paths to `bsdtar`.
 

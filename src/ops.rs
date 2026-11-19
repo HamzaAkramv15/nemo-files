@@ -58,6 +58,8 @@ struct Ctx<'a> {
     /// «для всех»: ответ на следующие конфликты
     all: Option<Resolve>,
     errors: Vec<String>,
+    /// замена файла: (временное имя, настоящее). Копия идёт во временное, и только целая встаёт на место
+    swap: Option<(PathBuf, PathBuf)>,
 }
 
 impl Ctx<'_> {
@@ -108,6 +110,12 @@ impl Ctx<'_> {
                     return None;
                 }
                 let m = std::fs::symlink_metadata(&dst);
+                // файл поверх файла: старый не трогаем, пока новый не скопирован целиком
+                if !src.is_dir() && m.as_ref().is_ok_and(|m| !m.is_dir()) {
+                    let tmp = temp_name(dir, &name);
+                    self.swap = Some((tmp.clone(), dst));
+                    return Some(tmp);
+                }
                 let gone = if m.map(|m| m.is_dir()).unwrap_or(false) && !src.is_dir() { std::fs::remove_dir_all(&dst) } else if src.is_dir() && dst.is_dir() { Ok(()) } else { std::fs::remove_file(&dst) };
                 if let Err(e) = gone {
                     self.err(&dst, &e);
@@ -129,6 +137,26 @@ fn into_itself(src: &Path, dst: &Path) -> bool {
         (Ok(s), Ok(d)) => d.starts_with(s),
         _ => dst.starts_with(src),
     }
+}
+
+/// скрытое временное имя рядом с настоящим (та же папка — значит, тот же диск, и rename атомарен)
+fn temp_name(dir: &Path, name: &str) -> PathBuf {
+    let stem: String = name.chars().take(120).collect();
+    dir.join(format!(".{stem}.nemo-part-{}", std::process::id()))
+}
+
+/// довести замену: целая копия встаёт на место старого файла одним rename; иначе временное убирается,
+/// а старый остаётся как был. Возвращает путь, под которым лежит результат
+fn settle(c: &mut Ctx, swap: Option<(PathBuf, PathBuf)>, ok: bool, d: &Path) -> PathBuf {
+    let Some((tmp, fin)) = swap else { return d.to_path_buf() };
+    if ok {
+        match std::fs::rename(&tmp, &fin) {
+            Ok(()) => return fin,
+            Err(e) => c.err(&fin, &e),
+        }
+    }
+    let _ = std::fs::remove_file(&tmp);
+    fin
 }
 
 fn same(a: &Path, b: &Path) -> bool {
@@ -255,7 +283,7 @@ fn copy_tree(c: &mut Ctx, src: &Path, dst: &Path) {
 }
 
 fn run(job: Job, send: &dyn Fn(Ev)) {
-    let mut c = Ctx { id: job.id, send, done: 0, total: 0, last: Instant::now(), stop: job.stop.clone(), all: None, errors: vec![] };
+    let mut c = Ctx { id: job.id, send, done: 0, total: 0, last: Instant::now(), stop: job.stop.clone(), all: None, errors: vec![], swap: None };
     let mut pairs: Vec<(PathBuf, PathBuf)> = vec![];
     let mut merged: Vec<PathBuf> = vec![];
     match job.kind {
@@ -274,16 +302,19 @@ fn run(job: Job, send: &dyn Fn(Ev)) {
                     continue;
                 }
                 let Some(d) = c.target(s, &job.dst) else { continue };
+                let swap = c.swap.take();
                 if job.kind == Kind::Move {
                     match std::fs::rename(s, &d) {
                         Ok(()) => {
                             c.done += size_of(&d);
+                            let d = settle(&mut c, swap, true, &d);
                             pairs.push((s.clone(), d));
                             continue;
                         }
                         Err(e) if e.raw_os_error() == Some(libc::EXDEV) => {}
                         Err(e) => {
                             c.err(s, &e);
+                            settle(&mut c, swap, false, &d);
                             continue;
                         }
                     }
@@ -294,8 +325,11 @@ fn run(job: Job, send: &dyn Fn(Ev)) {
                 }
                 copy_tree(&mut c, s, &d);
                 if c.stopped() {
+                    settle(&mut c, swap, false, &d);
                     break;
                 }
+                let ok = c.errors.len() == before;
+                let d = settle(&mut c, swap, ok, &d);
                 if job.kind == Kind::Move && c.errors.len() == before {
                     let r = if s.is_dir() && !s.is_symlink() { std::fs::remove_dir_all(s) } else { std::fs::remove_file(s) };
                     if let Err(e) = r {
@@ -414,7 +448,7 @@ mod tests {
     use super::*;
 
     fn ctx<'a>(send: &'a dyn Fn(Ev)) -> Ctx<'a> {
-        Ctx { id: 0, send, done: 0, total: 0, last: Instant::now(), stop: Arc::new(AtomicBool::new(false)), all: None, errors: vec![] }
+        Ctx { id: 0, send, done: 0, total: 0, last: Instant::now(), stop: Arc::new(AtomicBool::new(false)), all: None, errors: vec![], swap: None }
     }
 
     #[test]
@@ -482,6 +516,41 @@ mod tests {
         assert_eq!(std::fs::metadata(dst.join("d/e/f.txt")).unwrap().permissions().mode() & 0o777, 0o640);
         assert!(std::fs::metadata(dst.join("empty")).unwrap().len() == 0);
         assert_eq!(std::fs::read_link(dst.join("ln")).unwrap(), Path::new("d/e/f.txt"), "the link stays a link");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// замена файла: пока копия не целая, старый на месте; целая встаёт одним rename, временных следов нет
+    #[test]
+    fn replacing_a_file_never_loses_the_old_one() {
+        let dir = yami_px::paths::private_tmp("ops-swap").expect("tmp");
+        let (a, b) = (dir.join("a"), dir.join("b"));
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        std::fs::write(a.join("f"), b"new").unwrap();
+        std::fs::write(b.join("f"), b"old").unwrap();
+        let send = |_: Ev| {};
+        // успех: новое содержимое, ни временных файлов, ни потерь
+        let mut c = ctx(&send);
+        c.all = Some(Resolve::Replace);
+        let d = c.target(&a.join("f"), &b).unwrap();
+        assert_ne!(d, b.join("f"), "the copy goes to a temporary name first");
+        assert_eq!(std::fs::read(b.join("f")).unwrap(), b"old", "old file still there while copying");
+        let swap = c.swap.take();
+        copy_tree(&mut c, &a.join("f"), &d);
+        let fin = settle(&mut c, swap, true, &d);
+        assert_eq!(fin, b.join("f"));
+        assert_eq!(std::fs::read(b.join("f")).unwrap(), b"new");
+        assert_eq!(std::fs::read_dir(&b).unwrap().count(), 1, "no leftovers");
+        // неудача: старое остаётся как было, временное убрано
+        std::fs::write(a.join("f"), b"newer").unwrap();
+        let mut c = ctx(&send);
+        c.all = Some(Resolve::Replace);
+        let d = c.target(&a.join("f"), &b).unwrap();
+        let swap = c.swap.take();
+        std::fs::write(&d, b"half").unwrap();
+        settle(&mut c, swap, false, &d);
+        assert_eq!(std::fs::read(b.join("f")).unwrap(), b"new");
+        assert_eq!(std::fs::read_dir(&b).unwrap().count(), 1);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
