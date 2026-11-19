@@ -1,14 +1,14 @@
 [Desktop Entry]
 Type=Application
-Name=Files
-Name[pt_BR]=Arquivos
-Name[ru]=Файлы
+Name=Nemo Files
+Name[pt_BR]=Nemo Arquivos
+Name[ru]=Nemo Файлы
 GenericName=File Manager
 GenericName[pt_BR]=Gerenciador de arquivos
 GenericName[ru]=Файловый менеджер
-Comment=Pixel-art file manager of the yami shell
-Comment[pt_BR]=Gerenciador de arquivos em pixel art do yami
-Comment[ru]=Пиксельный файловый менеджер шелла yami
+Comment=Pixel-art file manager of the Nemo shell
+Comment[pt_BR]=Gerenciador de arquivos em pixel art do Nemo
+Comment[ru]=Пиксельный файловый менеджер шелла Nemo
 Exec=yami-files %U
 Icon=yami-files
 Terminal=false
