@@ -1,7 +1,8 @@
 # Nemo Files — audit, 2026-11-18
 
 Read: `ops.rs` (copy, move, delete, trash, restore, link, extract, compress), `trash.rs`, `fsx.rs` naming helpers.
-Not yet read: panes, drawing, mouse and keyboard handling, thumbnails, devices, portal, remote (about 8,000 of 12,000 lines).
+Read for risks only (not line by line): the undo code, rename, and a scan of every file for `unwrap`/`expect` in non-test code (all in start-up
+or lock handling; none on user data). Not read in depth: panes, drawing, mouse and keyboard handling, thumbnails, devices, portal, remote.
 Tests were 6; they are now 10.
 
 ## What is solid
@@ -25,8 +26,13 @@ Tests were 6; they are now 10.
    renamed over the old file (one atomic `rename`, same disk); a failed or cancelled copy removes the temporary and leaves the old
    file untouched. Folders still merge as before.
 
+4. **Renaming only the case** (`a.txt` to `A.txt`) on a case-insensitive disk (vfat, exfat) was refused as "already exists"; it is
+   allowed now when the target is the same file (the undo already did this).
+
 ## Known, not changed (decisions for later)
 
+- **Undo of a move that replaced a file cannot bring the replaced file back** (it is overwritten). The fix is to move the old file to
+  the trash first when replacing, which also needs the undo record to carry it.
 - A symlink to a folder counts as a folder in the "into itself" check (harmless: it only blocks a copy that makes no sense).
 - `Compress` with sources outside the destination folder passes absolute paths to `bsdtar`.
 

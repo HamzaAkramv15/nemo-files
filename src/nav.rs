@@ -287,7 +287,9 @@ impl Fm {
             return;
         }
         let to = r.path.with_file_name(&name);
-        if std::fs::symlink_metadata(&to).is_ok() {
+        // на vfat/exfat «a.txt» и «A.txt» — одно имя: переименование только регистра допустимо, это тот же файл
+        let ino = |p: &std::path::Path| std::fs::symlink_metadata(p).ok().map(|m| { use std::os::unix::fs::MetadataExt; (m.dev(), m.ino()) });
+        if std::fs::symlink_metadata(&to).is_ok() && !case_only_rename(&old, &name, ino(&r.path) == ino(&to)) {
             self.toast(crate::tf!("«{}» уже есть", "“{}” already exists", "“{}” já existe", name));
             return;
         }
@@ -300,5 +302,24 @@ impl Fm {
             }
             Err(e) => self.toast(fsx::err_text(&e)),
         }
+    }
+}
+
+/// переименование только регистра на файловой системе, где «a» и «A» — одно имя (то же самое устройство и inode)
+pub fn case_only_rename(old: &str, new: &str, same_file: bool) -> bool {
+    same_file && old != new && old.to_lowercase() == new.to_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::case_only_rename;
+
+    #[test]
+    fn only_a_case_change_of_the_same_file_may_take_an_existing_name() {
+        assert!(case_only_rename("a.txt", "A.txt", true));
+        assert!(case_only_rename("Фото.jpg", "фото.jpg", true));
+        assert!(!case_only_rename("a.txt", "A.txt", false), "a different file with that name: refuse");
+        assert!(!case_only_rename("a.txt", "b.txt", true), "another name is not a case change");
+        assert!(!case_only_rename("a.txt", "a.txt", true));
     }
 }
