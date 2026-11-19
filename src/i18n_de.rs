@@ -120,7 +120,7 @@ const DE: &[(&str, &str)] = &[
     ("links to", "verweist auf"),
     ("list", "Liste"),
     ("location", "Ort"),
-    ("look and language: ~/.config/yami/style.json", "Aussehen und Sprache: ~/.config/yami/style.json"),
+    ("look and language: ~/.config/nemo/style.json", "Aussehen und Sprache: ~/.config/nemo/style.json"),
     ("modified", "geändert"),
     ("mount", "einhängen"),
     ("mounting {}…", "hänge {} ein…"),

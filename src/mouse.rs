@@ -382,7 +382,7 @@ impl App {
                     let n = paths.len().to_string();
                     let nw = self.fonts.width(crate::font::PX, &n) + 8;
                     let br = R::new(iw - nw - 2, ih - 20, nw, 18);
-                    cv.pxbox(br, &yami_px::gfx::BoxStyle::new(t.red, crate::theme::CLEAR));
+                    cv.pxbox(br, &nemo_px::gfx::BoxStyle::new(t.red, crate::theme::CLEAR));
                     cv.text_center(&mut self.fonts, crate::font::PX, br, &n, t.on_accent);
                 }
                 let _ = buffer.attach_to(&icon);

@@ -1,12 +1,12 @@
 // Корзина по спецификации freedesktop: ~/.local/share/Trash для домашнего диска,
 // <точка монтирования>/.Trash-<uid> для остальных. Общая с Dolphin, Nautilus, gio trash.
-// Положить в неё и проверки корзины на чужом диске — yami_px::trash (то же у yami-view); здесь —
+// Положить в неё и проверки корзины на чужом диске — nemo_px::trash (то же у nemo-view); здесь —
 // список, возврат, очистка.
 
 use crate::fsx::Entry;
 use std::path::{Path, PathBuf};
-pub use yami_px::trash::home_trash;
-use yami_px::trash::{real_trash, uid};
+pub use nemo_px::trash::home_trash;
+use nemo_px::trash::{real_trash, uid};
 
 /// откуда удалён файл по строке «Path=» его .trashinfo. Домашняя корзина (top нет) — путь как записан.
 /// Корзина на чужом диске — только место на этом же диске: путь относительно его корня и не выше его
@@ -41,9 +41,9 @@ fn parse_stamp(s: &str) -> i64 {
 
 /// в корзину; Ok(путь в корзине)
 pub fn put(p: &Path) -> Result<PathBuf, String> {
-    yami_px::trash::put(p).map_err(|e| match e {
-        yami_px::trash::PutErr::NoTrash => crate::i18n::tr("корзина недоступна").to_string(),
-        yami_px::trash::PutErr::Io(e) => crate::fsx::err_text(&e),
+    nemo_px::trash::put(p).map_err(|e| match e {
+        nemo_px::trash::PutErr::NoTrash => crate::i18n::tr("корзина недоступна").to_string(),
+        nemo_px::trash::PutErr::Io(e) => crate::fsx::err_text(&e),
     })
 }
 

@@ -1,15 +1,15 @@
-# yami-files
+# nemo-files
 
 English · [Русский](README.ru.md)
 
 A file manager for Wayland that is also the file dialog of every app. Its own renderer, no toolkit:
 one binary of a few megabytes, about ten megabytes of memory, open in a blink. Part of the
-[yami](https://github.com/Trendorin/yami) desktop, and works on its own on any Wayland compositor
-(niri, Hyprland, Sway, river, KDE, GNOME): no yami shell needed.
+[Nemo](https://github.com/HamzaAkramv15/nemo) desktop, and works on its own on any Wayland compositor
+(niri, Hyprland, Sway, river, KDE, GNOME): no nemo shell needed.
 
-| neutral look (`plain`) | pixel look (`yami`) |
+| neutral look (`plain`) | pixel look (`nemo`) |
 |---|---|
-| ![yami-files in the neutral look](.github/assets/plain.png) | ![yami-files in the pixel look](.github/assets/pixel.png) |
+| ![nemo-files in the neutral look](.github/assets/plain.png) | ![nemo-files in the pixel look](.github/assets/pixel.png) |
 
 ## What it does
 
@@ -26,9 +26,9 @@ one binary of a few megabytes, about ten megabytes of memory, open in a blink. P
 **One file** (x86_64, glibc 2.34 or newer: every distribution of the last years):
 
 ```sh
-curl -LO https://github.com/Trendorin/yami/releases/latest/download/yami-files
-chmod +x yami-files
-./yami-files install
+curl -LO https://github.com/HamzaAkramv15/nemo/releases/latest/download/nemo-files
+chmod +x nemo-files
+./nemo-files install
 ```
 
 No Rust and no root. `install` asks the language, the look (neutral or pixel) and three things
@@ -39,26 +39,26 @@ what it will change and writes into `~/.local` only after your yes. `--yes` take
 **From source** (Rust 1.89 or newer):
 
 ```sh
-git clone https://github.com/Trendorin/yami-files
-cd yami-files
+git clone https://github.com/HamzaAkramv15/nemo-files
+cd nemo-files
 cargo build --release --locked
-target/release/yami-files install
+target/release/nemo-files install
 ```
 
-The drawing library, yami-px, comes with the build from the [yami](https://github.com/Trendorin/yami)
+The drawing library, nemo-px, comes with the build from the [Nemo](https://github.com/HamzaAkramv15/nemo)
 repository at the tag `Cargo.toml` names.
 
-`yami-files deps` lists what it uses from the system: wayland and libxkbcommon; optional
+`nemo-files deps` lists what it uses from the system: wayland and libxkbcommon; optional
 ffmpegthumbnailer (video thumbnails), libarchive (`bsdtar`, archives), udisks2 and gvfs (drives,
-phones, network places). `yami-files uninstall` takes everything back.
+phones, network places). `nemo-files uninstall` takes everything back.
 
 ## Use
 
 ```sh
-yami-files [FOLDER…]              # a window, one tab per folder
-yami-files --pick open|save|dir   # a dialog for scripts: the chosen paths on stdout, one per line
-yami-files --props FILE…          # file properties
-yami-files shot -o DIR            # the window as PNG without Wayland (for themes and bug reports)
+nemo-files [FOLDER…]              # a window, one tab per folder
+nemo-files --pick open|save|dir   # a dialog for scripts: the chosen paths on stdout, one per line
+nemo-files --props FILE…          # file properties
+nemo-files shot -o DIR            # the window as PNG without Wayland (for themes and bug reports)
 ```
 
 `--pick` also takes `--multiple`, `--title T`, `--name NAME`, `--folder DIR` and
@@ -68,7 +68,7 @@ The file dialog of every app: once `install` registered it, add this line under 
 `~/.config/xdg-desktop-portal/portals.conf` (or `<desktop>-portals.conf`):
 
 ```ini
-org.freedesktop.impl.portal.FileChooser=yami;gtk;
+org.freedesktop.impl.portal.FileChooser=nemo;gtk;
 ```
 
 | Keys | |
@@ -85,7 +85,7 @@ org.freedesktop.impl.portal.FileChooser=yami;gtk;
 
 ## Settings
 
-`~/.config/yami/files.json`: the program writes it as you use it; edit it by hand if you like,
+`~/.config/nemo/files.json`: the program writes it as you use it; edit it by hand if you like,
 it is read at the next start.
 
 | Key | Default | What |
@@ -110,12 +110,12 @@ restyles itself the moment you save them:
 
 | File | What |
 |---|---|
-| `~/.config/yami/style.json` | the look of every yami program: write a theme once, all of them take it |
-| `~/.config/yami/style.files.json` | what yami-files does differently (only those keys) |
+| `~/.config/nemo/style.json` | the look of every nemo program: write a theme once, all of them take it |
+| `~/.config/nemo/style.files.json` | what nemo-files does differently (only those keys) |
 
 | Key | Values |
 |---|---|
-| `preset` | `plain` (neutral) or `yami` (pixel art: whole pixels, notched corners, the Tiny5 font inside the binary) |
+| `preset` | `plain` (neutral) or `nemo` (pixel art: whole pixels, notched corners, the Tiny5 font inside the binary) |
 | `palette`, `accent` | `blood`, `ash`, `sakura`, `amber`, `venom`, `ice`, `dusk`; or any `#rrggbb`: the rest of the palette is made from it |
 | `light` | `true` or `false`; absent: as the system |
 | `corners`, `radius` | `notch`, `round` or `square`; the radius in pixels |
@@ -141,7 +141,7 @@ A theme of your own, for example a cold dark one:
 }
 ```
 
-…or the pixel look in any colour: `{ "preset": "yami", "accent": "#d65d0e" }`. Inside the yami
+…or the pixel look in any colour: `{ "preset": "nemo", "accent": "#d65d0e" }`. Inside the nemo
 desktop the shell writes `style.json` itself (settings → look); `style.files.json` still wins.
 
 ## License

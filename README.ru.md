@@ -1,15 +1,15 @@
-# yami-files
+# nemo-files
 
 [English](README.md) · Русский
 
 Файловый менеджер для Wayland, который заодно диалог выбора файлов для всех программ. Свой рендер,
 без тулкитов: один бинарь в несколько мегабайт, около десятка мегабайт памяти, открывается мгновенно. Часть рабочего
-стола [yami](https://github.com/Trendorin/yami), которая работает и сама по себе в любом
-Wayland-композиторе (niri, Hyprland, Sway, river, KDE, GNOME): шелл yami не нужен.
+стола [Nemo](https://github.com/HamzaAkramv15/nemo), которая работает и сама по себе в любом
+Wayland-композиторе (niri, Hyprland, Sway, river, KDE, GNOME): шелл nemo не нужен.
 
-| нейтральный вид (`plain`) | пиксельный вид (`yami`) |
+| нейтральный вид (`plain`) | пиксельный вид (`nemo`) |
 |---|---|
-| ![yami-files в нейтральном виде](.github/assets/plain.png) | ![yami-files в пиксельном виде](.github/assets/pixel.png) |
+| ![nemo-files в нейтральном виде](.github/assets/plain.png) | ![nemo-files в пиксельном виде](.github/assets/pixel.png) |
 
 ## Что умеет
 
@@ -26,9 +26,9 @@ Wayland-композиторе (niri, Hyprland, Sway, river, KDE, GNOME): шел
 **Один файл** (x86_64, glibc 2.34 или новее: любой дистрибутив последних лет):
 
 ```sh
-curl -LO https://github.com/Trendorin/yami/releases/latest/download/yami-files
-chmod +x yami-files
-./yami-files install
+curl -LO https://github.com/HamzaAkramv15/nemo/releases/latest/download/nemo-files
+chmod +x nemo-files
+./nemo-files install
 ```
 
 Без Rust и root. `install` спросит язык, вид (нейтральный или пиксельный) и три вещи (открывать
@@ -39,26 +39,26 @@ chmod +x yami-files
 **Из исходников** (Rust 1.89 или новее):
 
 ```sh
-git clone https://github.com/Trendorin/yami-files
-cd yami-files
+git clone https://github.com/HamzaAkramv15/nemo-files
+cd nemo-files
 cargo build --release --locked
-target/release/yami-files install
+target/release/nemo-files install
 ```
 
-Библиотека рисования yami-px приходит при сборке из репозитория
-[yami](https://github.com/Trendorin/yami) по тегу, который назван в `Cargo.toml`.
+Библиотека рисования nemo-px приходит при сборке из репозитория
+[Nemo](https://github.com/HamzaAkramv15/nemo) по тегу, который назван в `Cargo.toml`.
 
-`yami-files deps` — что берётся из системы: wayland и libxkbcommon; по желанию ffmpegthumbnailer
+`nemo-files deps` — что берётся из системы: wayland и libxkbcommon; по желанию ffmpegthumbnailer
 (миниатюры видео), libarchive (`bsdtar`, архивы), udisks2 и gvfs (диски, телефоны, сеть).
-`yami-files uninstall` убирает всё обратно.
+`nemo-files uninstall` убирает всё обратно.
 
 ## Как пользоваться
 
 ```sh
-yami-files [ПАПКА…]               # окно, по вкладке на папку
-yami-files --pick open|save|dir   # диалог для скриптов: выбранные пути в stdout, по строке
-yami-files --props ФАЙЛ…          # свойства файлов
-yami-files shot -o ПАПКА          # окно в PNG без Wayland (для тем и сообщений об ошибках)
+nemo-files [ПАПКА…]               # окно, по вкладке на папку
+nemo-files --pick open|save|dir   # диалог для скриптов: выбранные пути в stdout, по строке
+nemo-files --props ФАЙЛ…          # свойства файлов
+nemo-files shot -o ПАПКА          # окно в PNG без Wayland (для тем и сообщений об ошибках)
 ```
 
 `--pick` принимает ещё `--multiple`, `--title T`, `--name ИМЯ`, `--folder ПАПКА` и
@@ -68,7 +68,7 @@ yami-files shot -o ПАПКА          # окно в PNG без Wayland (для 
 `[preferred]` файла `~/.config/xdg-desktop-portal/portals.conf` (или `<рабочий стол>-portals.conf`):
 
 ```ini
-org.freedesktop.impl.portal.FileChooser=yami;gtk;
+org.freedesktop.impl.portal.FileChooser=nemo;gtk;
 ```
 
 | Клавиши | |
@@ -85,7 +85,7 @@ org.freedesktop.impl.portal.FileChooser=yami;gtk;
 
 ## Настройки
 
-`~/.config/yami/files.json`: программа пишет его сама по ходу дела; можно править руками, он
+`~/.config/nemo/files.json`: программа пишет его сама по ходу дела; можно править руками, он
 читается при следующем запуске.
 
 | Ключ | По умолчанию | Что |
@@ -110,12 +110,12 @@ org.freedesktop.impl.portal.FileChooser=yami;gtk;
 
 | Файл | Что |
 |---|---|
-| `~/.config/yami/style.json` | вид всех программ yami: тема пишется один раз, все её берут |
-| `~/.config/yami/style.files.json` | чем yami-files отличается (только эти ключи) |
+| `~/.config/nemo/style.json` | вид всех программ nemo: тема пишется один раз, все её берут |
+| `~/.config/nemo/style.files.json` | чем nemo-files отличается (только эти ключи) |
 
 | Ключ | Значения |
 |---|---|
-| `preset` | `plain` (нейтральный) или `yami` (пиксель-арт: целые пиксели, углы с вырезом, шрифт Tiny5 внутри бинаря) |
+| `preset` | `plain` (нейтральный) или `nemo` (пиксель-арт: целые пиксели, углы с вырезом, шрифт Tiny5 внутри бинаря) |
 | `palette`, `accent` | `blood`, `ash`, `sakura`, `amber`, `venom`, `ice`, `dusk`; или любой `#rrggbb`: остальная палитра строится от него |
 | `light` | `true` или `false`; нет ключа — как в системе |
 | `corners`, `radius` | `notch`, `round` или `square`; радиус в пикселях |
@@ -141,8 +141,8 @@ org.freedesktop.impl.portal.FileChooser=yami;gtk;
 }
 ```
 
-…или пиксельный вид любого цвета: `{ "preset": "yami", "accent": "#d65d0e" }`. В рабочем столе
-yami `style.json` пишет сам шелл (настройки → вид); `style.files.json` всё равно главнее.
+…или пиксельный вид любого цвета: `{ "preset": "nemo", "accent": "#d65d0e" }`. В рабочем столе
+nemo `style.json` пишет сам шелл (настройки → вид); `style.files.json` всё равно главнее.
 
 ## Лицензия
 

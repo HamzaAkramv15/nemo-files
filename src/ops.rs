@@ -453,12 +453,12 @@ mod tests {
 
     #[test]
     fn copies_by_kernel_and_by_hand() {
-        let dir = yami_px::paths::private_tmp("ops-test").expect("tmp");
+        let dir = nemo_px::paths::private_tmp("ops-test").expect("tmp");
         let big: Vec<u8> = (0..(40u32 << 20) / 4).flat_map(|i| i.to_le_bytes()).collect();
         let cases: Vec<(PathBuf, Vec<u8>)> = vec![
             (dir.join("big"), big),
             (dir.join("empty"), vec![]),
-            (dir.join("small"), b"yami".to_vec()),
+            (dir.join("small"), b"nemo".to_vec()),
         ];
         let send = |_: Ev| {};
         for (p, data) in &cases {
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn a_folder_cannot_go_into_itself_even_through_a_link() {
-        let dir = yami_px::paths::private_tmp("ops-self").expect("tmp");
+        let dir = nemo_px::paths::private_tmp("ops-self").expect("tmp");
         let a = dir.join("a");
         std::fs::create_dir_all(a.join("sub")).unwrap();
         let link = dir.join("link");
@@ -500,7 +500,7 @@ mod tests {
     #[test]
     fn copy_tree_keeps_structure_links_and_modes() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = yami_px::paths::private_tmp("ops-tree").expect("tmp");
+        let dir = nemo_px::paths::private_tmp("ops-tree").expect("tmp");
         let src = dir.join("src");
         std::fs::create_dir_all(src.join("d/e")).unwrap();
         std::fs::write(src.join("d/e/f.txt"), b"hello").unwrap();
@@ -522,7 +522,7 @@ mod tests {
     /// замена файла: пока копия не целая, старый на месте; целая встаёт одним rename, временных следов нет
     #[test]
     fn replacing_a_file_never_loses_the_old_one() {
-        let dir = yami_px::paths::private_tmp("ops-swap").expect("tmp");
+        let dir = nemo_px::paths::private_tmp("ops-swap").expect("tmp");
         let (a, b) = (dir.join("a"), dir.join("b"));
         std::fs::create_dir_all(&a).unwrap();
         std::fs::create_dir_all(&b).unwrap();

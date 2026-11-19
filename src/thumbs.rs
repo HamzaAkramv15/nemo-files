@@ -1,5 +1,5 @@
 // Миниатюры в отдельной нити: картинки (png, jpeg) — сами, видео — через ffmpegthumbnailer,
-// если он есть. Готовое кладётся в ~/.cache/yami/thumbs, чтобы второй раз не декодировать.
+// если он есть. Готовое кладётся в ~/.cache/nemo/thumbs, чтобы второй раз не декодировать.
 // Очередь — «последний пришёл, первый ушёл»: сначала то, что сейчас на экране.
 
 use crate::gfx::Img;
@@ -28,7 +28,7 @@ fn has(cmd: &str) -> bool {
 
 fn make(r: &Req) -> Option<Img> {
     if !r.video {
-        // картинки: общий декод и кеш (yami-px)
+        // картинки: общий декод и кеш (nemo-px)
         return crate::icons::thumb(&r.path, r.mtime, r.size).map(|t| crate::icons::from_rgba(&t));
     }
     let cp = cache_path(r);
@@ -66,7 +66,7 @@ impl Thumbs {
             let img = make(&r);
             send(r.path, r.size, img);
             // большие картинки декодировались — вернуть память системе
-            yami_px::trim_heap();
+            nemo_px::trim_heap();
         });
         Thumbs { q }
     }

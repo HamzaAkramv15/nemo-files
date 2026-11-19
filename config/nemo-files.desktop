@@ -9,23 +9,23 @@ GenericName[ru]=Файловый менеджер
 Comment=Pixel-art file manager of the Nemo shell
 Comment[pt_BR]=Gerenciador de arquivos em pixel art do Nemo
 Comment[ru]=Пиксельный файловый менеджер шелла Nemo
-Exec=yami-files %U
-Icon=yami-files
+Exec=nemo-files %U
+Icon=nemo-files
 Terminal=false
 MimeType=inode/directory;
 Categories=System;FileTools;FileManager;Utility;
 Keywords=folder;files;explorer;dolphin;
-StartupWMClass=yami-files
+StartupWMClass=nemo-files
 Actions=new-window;trash;
 
 [Desktop Action new-window]
 Name=New window
 Name[pt_BR]=Nova janela
 Name[ru]=Новое окно
-Exec=yami-files
+Exec=nemo-files
 
 [Desktop Action trash]
 Name=Trash
 Name[pt_BR]=Lixeira
 Name[ru]=Корзина
-Exec=yami-files trash:///
+Exec=nemo-files trash:///

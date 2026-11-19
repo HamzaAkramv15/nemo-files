@@ -1,7 +1,7 @@
 // Снимки окна файлов без Wayland: собирает папку-образец во временном каталоге (по файлу
-// каждого типа, папки, картинка) и рисует нужное состояние в PNG. Как `yami-shell shot`.
+// каждого типа, папки, картинка) и рисует нужное состояние в PNG. Как `nemo-shell shot`.
 //
-//   yami-files shot [ЦЕЛЬ…] [--lang ru|en] [-o ПАПКА]
+//   nemo-files shot [ЦЕЛЬ…] [--lang ru|en] [-o ПАПКА]
 
 use crate::act::Ui;
 use crate::fm::{Dlg, Fm, Mode};
@@ -25,7 +25,7 @@ fn fixture(root: &Path) {
     for d in ["проекты", "фото с моря", "Downloads", "музыка", ".config"] { // i18n-ok
         let _ = std::fs::create_dir_all(root.join(d));
     }
-    mk("README.md", b"# yami\n\nPixel-art rice for niri.\n\n- shell\n- files\n- portal\n");
+    mk("README.md", b"# nemo\n\nPixel-art rice for niri.\n\n- shell\n- files\n- portal\n");
     mk("main.rs", b"fn main() {\n    println!(\"hi\");\n}\n");
     mk("notes.txt", "купить хлеба\nпочинить niri\n".as_bytes()); // i18n-ok
     mk("report-2026.pdf", b"%PDF-1.4\n");
@@ -65,7 +65,7 @@ pub fn run(args: &[String]) -> i32 {
             "--fit" => {}
             "--theme" => mode = it.next().map(|m| m == "light"),
             "-h" | "--help" | "list" => {
-                println!("yami-files shot [TARGET…] [--lang ru|en] [--theme dark|light] [--fit] [-o DIR]\ntargets: {}", TARGETS.join(" "));
+                println!("nemo-files shot [TARGET…] [--lang ru|en] [--theme dark|light] [--fit] [-o DIR]\ntargets: {}", TARGETS.join(" "));
                 return 0;
             }
             t if TARGETS.contains(&t) => targets.push(t.to_string()),
@@ -85,10 +85,10 @@ pub fn run(args: &[String]) -> i32 {
     look.animations = false;
     crate::i18n::set(&look.lang);
     // русская надпись без перевода — ошибка на любом языке, кроме русского; `--fit`: надписи, которым тесно
-    let audit = !matches!(yami_px::i18n::normalize(&lang), "ru" | "");
+    let audit = !matches!(nemo_px::i18n::normalize(&lang), "ru" | "");
     crate::i18n::audit(audit);
-    yami_px::gfx::watch_text(args.iter().any(|a| a == "--fit"));
-    let root = std::env::temp_dir().join(format!("yami-files-shot-{}", std::process::id()));
+    nemo_px::gfx::watch_text(args.iter().any(|a| a == "--fit"));
+    let root = std::env::temp_dir().join(format!("nemo-files-shot-{}", std::process::id()));
     fixture(&root);
     let _ = std::fs::create_dir_all(&out);
     let mut fonts = Fonts::with(look.font("files"));
@@ -237,7 +237,7 @@ pub fn run(args: &[String]) -> i32 {
         for _ in 0..2 {
             let mut ui = Ui { cv: Canvas::new(&mut buf, w, h), f: &mut fonts, ic: &mut icons, t: look.theme, zones: vec![], ptr: None, down: false, anim: false, blink: true, tr: crate::i18n::tr };
             // shot --fit смотрит только последний проход
-            let _ = yami_px::gfx::take_text();
+            let _ = nemo_px::gfx::take_text();
             crate::draw::draw(&mut ui, &fm, w, h);
         }
         // миниатюры — синхронно, чтобы попали в снимок
@@ -249,14 +249,14 @@ pub fn run(args: &[String]) -> i32 {
             }
             let mut ui = Ui { cv: Canvas::new(&mut buf, w, h), f: &mut fonts, ic: &mut icons, t: look.theme, zones: vec![], ptr: None, down: false, anim: false, blink: true, tr: crate::i18n::tr };
             // shot --fit смотрит только последний проход
-            let _ = yami_px::gfx::take_text();
+            let _ = nemo_px::gfx::take_text();
             crate::draw::draw(&mut ui, &fm, w, h);
         }
         let path = out.join(format!("{t}.png"));
         save_png(&buf, w, h, &path);
         println!("{}", path.display());
         // a-very-long-file-name… в образцовой папке и сделано, чтобы сокращаться
-        for p in yami_px::gfx::fit_report().into_iter().filter(|p| !p.contains("a-very-long-file-name")) {
+        for p in nemo_px::gfx::fit_report().into_iter().filter(|p| !p.contains("a-very-long-file-name")) {
             println!("  layout [{t}]: {p}");
             bad = 1;
         }

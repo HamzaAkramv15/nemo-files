@@ -120,7 +120,7 @@ const UK: &[(&str, &str)] = &[
     ("links to", "посилається на"),
     ("list", "список"),
     ("location", "розташування"),
-    ("look and language: ~/.config/yami/style.json", "вигляд і мова: ~/.config/yami/style.json"),
+    ("look and language: ~/.config/nemo/style.json", "вигляд і мова: ~/.config/nemo/style.json"),
     ("modified", "змінено"),
     ("mount", "змонтувати"),
     ("mounting {}…", "монтую {}…"),

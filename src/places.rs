@@ -24,7 +24,7 @@ impl Place {
     }
 }
 
-/// папка XDG из ~/.config/user-dirs.dirs (yami-px)
+/// папка XDG из ~/.config/user-dirs.dirs (nemo-px)
 pub use crate::paths::xdg_dir;
 
 /// стандартные места: ключ, имя, ключ XDG, запасная папка, значок

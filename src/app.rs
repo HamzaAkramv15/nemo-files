@@ -130,12 +130,12 @@ pub struct App {
 }
 
 type ZoneA = Zone<Act>;
-use yami_px::ui::Zone;
+use nemo_px::ui::Zone;
 
 pub fn run(fm_init: impl FnOnce(Option<calloop::channel::Sender<Msg>>) -> Fm) -> Fm {
     // из TTY или по ssh: понятная строка вместо паники
     let Ok(conn) = Connection::connect_to_env() else {
-        eprintln!("yami-files: no Wayland display (start it inside niri, or set WAYLAND_DISPLAY)");
+        eprintln!("nemo-files: no Wayland display (start it inside niri, or set WAYLAND_DISPLAY)");
         std::process::exit(1);
     };
     let (globals, mut queue) = registry_queue_init::<App>(&conn).expect("wayland registry");
@@ -167,7 +167,7 @@ pub fn run(fm_init: impl FnOnce(Option<calloop::channel::Sender<Msg>>) -> Fm) ->
     let surface = compositor.create_surface(&qh);
     let window = xdg.create_window(surface, WindowDecorations::RequestServer, &qh);
     let pick = fm.pick.is_some();
-    window.set_app_id(if pick { "yami-files-pick" } else { "yami-files" });
+    window.set_app_id(if pick { "nemo-files-pick" } else { "nemo-files" });
     window.set_title(fm.title());
     window.set_min_size(Some((480, 320)));
     window.commit();
@@ -530,7 +530,7 @@ impl App {
         let scrolling = self.step_scroll();
         let (w, h) = (self.w, self.h);
         // HiDPI: буфер в физических пикселях, холст логический, увеличение ближайшим соседом
-        let (pw, ph) = if self.hidpi.is_none() || self.scale == 1.0 { (w, h) } else { yami_px::gfx::phys(w, h, self.scale) };
+        let (pw, ph) = if self.hidpi.is_none() || self.scale == 1.0 { (w, h) } else { nemo_px::gfx::phys(w, h, self.scale) };
         let up = (pw, ph) != (w, h);
         let need = (pw * ph * 4) as usize;
         if self.pool.as_ref().map(|p| p.len() < need).unwrap_or(true) {
@@ -557,7 +557,7 @@ impl App {
             blur = std::mem::take(&mut ui.cv.blur);
         }
         if up {
-            yami_px::gfx::upscale(&scratch, w, h, unsafe { std::slice::from_raw_parts_mut(out_ptr, out_len) }, pw, ph);
+            nemo_px::gfx::upscale(&scratch, w, h, unsafe { std::slice::from_raw_parts_mut(out_ptr, out_len) }, pw, ph);
         }
         self.scratch = scratch;
         let surf = self.window.wl_surface().clone();

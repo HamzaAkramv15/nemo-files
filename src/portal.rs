@@ -1,13 +1,13 @@
 // Бэкенд xdg-desktop-portal: org.freedesktop.impl.portal.FileChooser. Браузеры (Firefox,
 // LibreWolf, Chromium), Telegram, Electron и всё, что идёт через портал, вместо окна GNOME
-// получают пиксельный диалог yami-files. Сам процесс без окон (~2 МБ): на каждый запрос
-// запускает `yami-files --pick …` и ждёт выбранные пути.
+// получают пиксельный диалог nemo-files. Сам процесс без окон (~2 МБ): на каждый запрос
+// запускает `nemo-files --pick …` и ждёт выбранные пути.
 //
-// Подключение: ~/.local/share/xdg-desktop-portal/portals/yami.portal,
-// ~/.config/xdg-desktop-portal/niri-portals.conf (FileChooser=yami), D-Bus-активация из
+// Подключение: ~/.local/share/xdg-desktop-portal/portals/nemo.portal,
+// ~/.config/xdg-desktop-portal/niri-portals.conf (FileChooser=nemo), D-Bus-активация из
 // ~/.local/share/dbus-1/services — всё кладёт установщик (шаг «портал»).
 //
-// Новый бинарь (обновление, tools/deploy.sh): `yami-files --portal-reload` шлёт SIGHUP, портал
+// Новый бинарь (обновление, tools/deploy.sh): `nemo-files --portal-reload` шлёт SIGHUP, портал
 // exec'ает себя заново, как только свободен (нет открытого диалога).
 
 use std::collections::HashMap;
@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use zbus::zvariant::{OwnedValue, Value};
 
-pub const NAME: &str = "org.freedesktop.impl.portal.desktop.yami";
+pub const NAME: &str = "org.freedesktop.impl.portal.desktop.nemo";
 /// «показать в папке» из браузеров, торрент-клиентов, Telegram
 pub const FM1: &str = "org.freedesktop.FileManager1";
 
@@ -23,8 +23,8 @@ struct FileManager;
 
 /// свой бинарь; после обновления старый файл удалён («… (deleted)») — берём новый по тому же пути
 pub fn exe() -> Option<std::path::PathBuf> {
-    let p = yami_px::paths::self_exe();
-    Some(if p.exists() { p } else { "yami-files".into() })
+    let p = nemo_px::paths::self_exe();
+    Some(if p.exists() { p } else { "nemo-files".into() })
 }
 
 fn open_window(args: Vec<String>) {
@@ -96,7 +96,7 @@ fn safe_name(n: &str) -> String {
 }
 
 fn filter_arg(f: &Filter) -> String {
-    // 0 — шаблон (*.png), 1 — MIME (image/png): yami-files различает их по «/»
+    // 0 — шаблон (*.png), 1 — MIME (image/png): nemo-files различает их по «/»
     let pats: Vec<&str> = f.1.iter().map(|(_, p)| p.as_str()).collect();
     format!("{}|{}", f.0.replace('|', "/"), pats.join(";"))
 }
@@ -129,7 +129,7 @@ impl Drop for Busy {
             let _ = std::thread::Builder::new().name("shed".into()).spawn(|| {
                 std::thread::sleep(Duration::from_secs(30));
                 if BUSY.load(Ordering::SeqCst) == 0 {
-                    yami_px::shed_code();
+                    nemo_px::shed_code();
                 }
             });
         }
@@ -144,20 +144,20 @@ fn reexec_if_idle() {
     let Some(exe) = exe() else { return };
     // тот же pid (D-Bus-активация его и держит), имена на шине берутся заново
     let e = std::process::Command::new(exe).arg("--portal").exec();
-    eprintln!("yami-files --portal: exec: {e}");
+    eprintln!("nemo-files --portal: exec: {e}");
 }
 
-/// `yami-files --portal-reload`: работающий портал — на новый бинарь, нет его — поднять
+/// `nemo-files --portal-reload`: работающий портал — на новый бинарь, нет его — поднять
 pub fn reload() -> i32 {
     let me = std::process::id();
     // только портал из этого же файла: копия из другой установки (пакет, чужой HOME) — не наша
-    let mine = yami_px::paths::self_exe();
+    let mine = nemo_px::paths::self_exe();
     let same = |p: &u32| {
         let Ok(e) = std::fs::read_link(format!("/proc/{p}/exe")) else { return false };
         let s = e.to_string_lossy();
         std::path::Path::new(s.strip_suffix(" (deleted)").unwrap_or(&s)) == mine
     };
-    let running = || yami_px::paths::pids("yami-files", "--portal").into_iter().filter(|p| *p != me && same(p)).collect::<Vec<u32>>();
+    let running = || nemo_px::paths::pids("nemo-files", "--portal").into_iter().filter(|p| *p != me && same(p)).collect::<Vec<u32>>();
     let pids = running();
     for p in &pids {
         unsafe { libc::kill(*p as i32, libc::SIGHUP) };
@@ -184,7 +184,7 @@ pub fn reload() -> i32 {
         let _ = bus.start_service_by_name(wk.clone(), 0);
         std::thread::sleep(Duration::from_millis(200));
     }
-    eprintln!("yami-files --portal-reload: {NAME} did not start");
+    eprintln!("nemo-files --portal-reload: {NAME} did not start");
     1
 }
 
@@ -337,21 +337,21 @@ pub fn serve() -> i32 {
     let conn = match built {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("yami-files --portal: {e}");
+            eprintln!("nemo-files --portal: {e}");
             return 1;
         }
     };
     // имена: портал и FileManager1 (второе может быть занято Dolphin — тогда без него)
     use zbus::fdo::RequestNameFlags;
     if let Err(e) = conn.request_name_with_flags(NAME, RequestNameFlags::ReplaceExisting.into()) {
-        eprintln!("yami-files --portal: {NAME}: {e}");
+        eprintln!("nemo-files --portal: {NAME}: {e}");
     }
     let _ = conn.request_name_with_flags(FM1, RequestNameFlags::ReplaceExisting | RequestNameFlags::AllowReplacement);
     // живём, пока жива сессия; шина держит соединение
     let _keep = conn;
     // старт позади: код окна файлов, который порталу не нужен, — из памяти (5 МБ → ~1)
     std::thread::sleep(std::time::Duration::from_secs(2));
-    yami_px::shed_code();
+    nemo_px::shed_code();
     loop {
         let mut sig = 0;
         if unsafe { libc::sigwait(&hup, &mut sig) } == 0 && sig == libc::SIGHUP {

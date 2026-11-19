@@ -273,7 +273,7 @@ impl Fm {
                 self.load_active();
             }
             Cmd::Settings => self.dlg = Some((Dlg::Settings, Instant::now())),
-            Cmd::NewWindow => spawn(&[crate::portal::exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| "yami-files".into()), dir.to_string_lossy().to_string()], None),
+            Cmd::NewWindow => spawn(&[crate::portal::exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| "nemo-files".into()), dir.to_string_lossy().to_string()], None),
             Cmd::NewTab => {
                 self.open_tab(dir);
                 self.watch_dirty = true;

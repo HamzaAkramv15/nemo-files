@@ -1,16 +1,16 @@
-// yami-files — файловый менеджер для Wayland. Своё окно, свой рендер в shm,
+// nemo-files — файловый менеджер для Wayland. Своё окно, свой рендер в shm,
 // никаких тулкитов: ~3 МБ бинарь, десяток мегабайт памяти. Тот же бинарь — диалог выбора
 // файлов для xdg-desktop-portal (браузеры, Telegram, всё на GTK/Qt через портал).
 //
-//   yami-files [ПАПКА…]                открыть окно (каждая папка — вкладка)
-//   yami-files --pick open|save|dir    диалог: выбранные пути — в stdout по строке
+//   nemo-files [ПАПКА…]                открыть окно (каждая папка — вкладка)
+//   nemo-files --pick open|save|dir    диалог: выбранные пути — в stdout по строке
 //        [--multiple] [--title T] [--accept T] [--name ИМЯ] [--folder ПАПКА]
 //        [--filter "Name|*.png;*.jpg|image/*"]…
-//   yami-files --portal                бэкенд org.freedesktop.impl.portal.FileChooser и
+//   nemo-files --portal                бэкенд org.freedesktop.impl.portal.FileChooser и
 //                                      org.freedesktop.FileManager1 («показать в папке»)
-//   yami-files --props ФАЙЛ…           свойства файлов
-//   yami-files --unlock /dev/…         пароль зашифрованного диска (спрашивает и yami-agents)
-//   yami-files shot [ЦЕЛЬ…] [--lang en] [-o ПАПКА]   снимки окна в PNG без Wayland
+//   nemo-files --props ФАЙЛ…           свойства файлов
+//   nemo-files --unlock /dev/…         пароль зашифрованного диска (спрашивает и nemo-agents)
+//   nemo-files shot [ЦЕЛЬ…] [--lang en] [-o ПАПКА]   снимки окна в PNG без Wayland
 
 mod setup;
 mod act;
@@ -42,7 +42,7 @@ mod trash;
 mod watch;
 mod wayland;
 
-pub use yami_px::{font, gfx, icons, look, paths, theme, ui};
+pub use nemo_px::{font, gfx, icons, look, paths, theme, ui};
 
 use std::path::PathBuf;
 
@@ -93,7 +93,7 @@ fn pick_from_args(args: &[String]) -> (fm::Pick, Vec<PathBuf>) {
     (p, dirs)
 }
 
-/// выбранное — на stdout. Строками (шелл, yami-shot): имя с переводом строки так не передать — оно
+/// выбранное — на stdout. Строками (шелл, nemo-shot): имя с переводом строки так не передать — оно
 /// пропускается, иначе подсунуло бы лишний путь. С --null (портал): номер выбранного фильтра, потом
 /// пути байтами как есть, каждое поле — с \0 в конце
 fn put_picked(v: &[PathBuf], filter: usize, null: bool) {
@@ -109,7 +109,7 @@ fn put_picked(v: &[PathBuf], filter: usize, null: bool) {
     } else {
         for p in v {
             if p.as_os_str().as_bytes().contains(&b'\n') {
-                eprintln!("yami-files: {p:?} has a line break in its name, left out");
+                eprintln!("nemo-files: {p:?} has a line break in its name, left out");
                 continue;
             }
             let _ = writeln!(o, "{}", p.display());
@@ -119,17 +119,18 @@ fn put_picked(v: &[PathBuf], filter: usize, null: bool) {
 }
 
 fn main() {
+    nemo_px::paths::migrate_legacy();
     let args: Vec<String> = std::env::args().collect();
-    if let Some(c) = yami_px::install::dispatch(&setup::SPEC, &args[1..]) {
+    if let Some(c) = nemo_px::install::dispatch(&setup::SPEC, &args[1..]) {
         std::process::exit(c);
     }
     match args.get(1).map(|s| s.as_str()) {
         Some("--version") => {
-            println!("yami-files {}", env!("CARGO_PKG_VERSION"));
+            println!("nemo-files {}", env!("CARGO_PKG_VERSION"));
             return;
         }
         Some("-h") | Some("--help") => {
-            println!("yami-files [DIR…] | install | uninstall | deps | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… [--null] | --portal | --portal-reload | shot [TARGET…] [--lang en] [-o DIR]");
+            println!("nemo-files [DIR…] | install | uninstall | deps | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… [--null] | --portal | --portal-reload | shot [TARGET…] [--lang en] [-o DIR]");
             return;
         }
         Some("shot") => std::process::exit(shot::run(&args[2..])),
@@ -137,8 +138,8 @@ fn main() {
         Some("--portal-reload") => std::process::exit(portal::reload()),
         _ => {}
     }
-    // через 15 с старт позади и окно открыто: код старта — из памяти (yami_px::shed_code)
-    yami_px::shed_code_later(15);
+    // через 15 с старт позади и окно открыто: код старта — из памяти (nemo_px::shed_code)
+    nemo_px::shed_code_later(15);
     let look = look::Look::load("files");
     i18n::set(&look.lang);
     let cfg = cfg::Cfg::load();

@@ -275,7 +275,7 @@ pub fn kind_glyph(k: Kind) -> &'static str {
 
 thread_local! {
     /// системный набор значков для сглаженных стилей: заводится при первом значке
-    static SYSTEM: std::cell::RefCell<Option<yami_px::icons::Icons>> = const { std::cell::RefCell::new(None) };
+    static SYSTEM: std::cell::RefCell<Option<nemo_px::icons::Icons>> = const { std::cell::RefCell::new(None) };
 }
 
 /// имя значка по спецификации freedesktop
@@ -318,7 +318,7 @@ fn system_name(kind: Kind, sp: Special) -> &'static str {
 fn draw_system(cv: &mut Canvas, kind: Kind, sp: Special, x: i32, y: i32, size: i32, k: f32) -> bool {
     let img = SYSTEM.with(|s| {
         let mut s = s.borrow_mut();
-        let ic = s.get_or_insert_with(|| yami_px::icons::Icons::new(&yami_px::icons::system_theme()));
+        let ic = s.get_or_insert_with(|| nemo_px::icons::Icons::new(&nemo_px::icons::system_theme()));
         ic.get(system_name(kind, sp), size)
     });
     match img {

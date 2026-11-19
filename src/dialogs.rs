@@ -77,7 +77,7 @@ pub(crate) fn dialog(ui: &mut Ui, fm: &Fm, d: &Dlg, born: Instant, w: i32, h: i3
             let fx = r.x + 110;
             let fw = r.right() - 16 - fx;
             let mut y = r.y + 50;
-            let rows: [(&str, &str, &yami_px::ui::Field, bool); 3] = [("адрес", "smb://nas/share", addr, false), ("логин", "необязательно", user, false), ("пароль", "", pass, true)];
+            let rows: [(&str, &str, &nemo_px::ui::Field, bool); 3] = [("адрес", "smb://nas/share", addr, false), ("логин", "необязательно", user, false), ("пароль", "", pass, true)];
             for (n, (label, ph, f, pw)) in rows.into_iter().enumerate() {
                 ui.text_in(PX, R::new(lx, y, 90, 32), label, t.text_dim);
                 let fr = R::new(fx, y, fw, 32);
@@ -340,7 +340,7 @@ pub(crate) fn settings(ui: &mut Ui, fm: &Fm, born: Instant, w: i32, h: i32) {
     cyc(ui, R::new(col2, yr, cw, 28), "порядок", sort, "sort");
     let yb = yl.max(y) + 6;
     ui.slider(R::new(x, yb, cw, 40), "размер значков", (c.zoom + 1) as f32 / 5.0, &format!("{}px", 16 * c.icon_u()), 5, Act::SZoom);
-    ui.text_in(PX, R::new(x, r.bottom() - 70, r.w - 36, 18), "вид и язык: ~/.config/yami/style.json", t.text_faint);
+    ui.text_in(PX, R::new(x, r.bottom() - 70, r.w - 36, 18), "вид и язык: ~/.config/nemo/style.json", t.text_faint);
     raw(ui, PX, R::new(x, r.bottom() - 50, r.w / 2, 18), &format!("{}: {}", crate::i18n::tr("терминал"), c.terminal), t.text_faint);
     buttons(ui, r, &[("готово", "cancel", Tone::Primary)]);
     dissolve_dlg(ui, fm, born, r);

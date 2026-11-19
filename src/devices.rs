@@ -67,7 +67,7 @@ impl Fm {
         });
     }
 
-    /// окно пароля зашифрованного диска (щелчок по нему или `yami-files --unlock /dev/…`)
+    /// окно пароля зашифрованного диска (щелчок по нему или `nemo-files --unlock /dev/…`)
     pub fn unlock_dlg(&mut self, dev: &str, name: String) {
         if !dev.starts_with("/dev/") || dev.contains("..") {
             return;
@@ -292,8 +292,8 @@ impl Fm {
 /// отпечаток устройств без запуска программ: разделы (/proc/partitions), точки монтирования
 /// (mountinfo), USB (телефоны и камеры появляются там раньше, чем у gio) и подключения gvfs
 fn sig() -> u64 {
-    let mut h = yami_px::FNV0;
-    let mut eat = |b: &[u8]| h = yami_px::fnv(h, b);
+    let mut h = nemo_px::FNV0;
+    let mut eat = |b: &[u8]| h = nemo_px::fnv(h, b);
     for f in ["/proc/partitions", "/proc/self/mountinfo"] {
         eat(&std::fs::read(f).unwrap_or_default());
     }
@@ -351,6 +351,6 @@ mod tests {
         assert_eq!(super::unoctal(r"/mnt/a\134b\011c"), Path::new("/mnt/a\\b\tc"));
         // не код — как есть, без переполнения
         assert_eq!(super::unoctal(r"/mnt/\777\04"), Path::new(r"/mnt/\777\04"));
-        assert!(super::mount_point("/dev/nonexistent-yami").is_none());
+        assert!(super::mount_point("/dev/nonexistent-nemo").is_none());
     }
 }

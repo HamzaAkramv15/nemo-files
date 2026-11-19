@@ -59,10 +59,10 @@ pub enum Act {
     Dim,
 }
 
-impl yami_px::ui::Action for Act {
+impl nemo_px::ui::Action for Act {
     fn block() -> Self {
         Act::Block
     }
 }
 
-pub type Ui<'a, 'b> = yami_px::ui::Ui<'a, 'b, Act>;
+pub type Ui<'a, 'b> = nemo_px::ui::Ui<'a, 'b, Act>;

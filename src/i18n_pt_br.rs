@@ -34,7 +34,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("clipboard is empty", "a área de transferência está vazia"),
     ("close", "fechar"),
     ("code", "código"),
-    ("look and language: ~/.config/yami/style.json", "aparência e idioma: ~/.config/yami/style.json"),
+    ("look and language: ~/.config/nemo/style.json", "aparência e idioma: ~/.config/nemo/style.json"),
     ("compress", "compactar"),
     ("compressing", "compactando"),
     ("connect anyway", "conectar mesmo assim"),
