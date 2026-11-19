@@ -1,6 +1,6 @@
 [package]
 name = "nemo-files"
-version = "3.0.0"
+version = "3.2.0"
 edition = "2021"
 description = "File manager for Wayland and the file dialog of every app"
 license = "MIT"
