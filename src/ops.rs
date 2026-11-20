@@ -42,6 +42,8 @@ pub struct Job {
     /// для сжатия: имя архива
     pub name: String,
     pub stop: Arc<AtomicBool>,
+    /// пауза: пока стоит, копирование и перенос не идут дальше (отмена всё равно срабатывает)
+    pub pause: Arc<AtomicBool>,
 }
 
 pub fn spawn(job: Job, send: impl Fn(Ev) + Send + 'static) {
@@ -55,6 +57,7 @@ struct Ctx<'a> {
     total: u64,
     last: Instant,
     stop: Arc<AtomicBool>,
+    pause: Arc<AtomicBool>,
     /// «для всех»: ответ на следующие конфликты
     all: Option<Resolve>,
     errors: Vec<String>,
@@ -69,7 +72,11 @@ impl Ctx<'_> {
             (self.send)(Ev::Progress { id: self.id, done: self.done, total: self.total, name: name.to_string() });
         }
     }
+    /// остановлено ли дело; на паузе ждёт здесь же (копирование зовёт это на каждом куске, так что встаёт сразу), отмена будит
     fn stopped(&self) -> bool {
+        while self.pause.load(Ordering::Relaxed) && !self.stop.load(Ordering::Relaxed) {
+            std::thread::sleep(std::time::Duration::from_millis(60));
+        }
         self.stop.load(Ordering::Relaxed)
     }
     fn err(&mut self, p: &Path, e: &std::io::Error) {
@@ -292,7 +299,7 @@ fn copy_tree(c: &mut Ctx, src: &Path, dst: &Path) {
 }
 
 fn run(job: Job, send: &dyn Fn(Ev)) {
-    let mut c = Ctx { id: job.id, send, done: 0, total: 0, last: Instant::now(), stop: job.stop.clone(), all: None, errors: vec![], swap: None };
+    let mut c = Ctx { id: job.id, send, done: 0, total: 0, last: Instant::now(), stop: job.stop.clone(), pause: job.pause.clone(), all: None, errors: vec![], swap: None };
     let mut pairs: Vec<(PathBuf, PathBuf)> = vec![];
     let mut merged: Vec<PathBuf> = vec![];
     match job.kind {
@@ -457,7 +464,7 @@ mod tests {
     use super::*;
 
     fn ctx<'a>(send: &'a dyn Fn(Ev)) -> Ctx<'a> {
-        Ctx { id: 0, send, done: 0, total: 0, last: Instant::now(), stop: Arc::new(AtomicBool::new(false)), all: None, errors: vec![], swap: None }
+        Ctx { id: 0, send, done: 0, total: 0, last: Instant::now(), stop: Arc::new(AtomicBool::new(false)), pause: Arc::new(AtomicBool::new(false)), all: None, errors: vec![], swap: None }
     }
 
     #[test]
@@ -588,4 +595,54 @@ mod tests {
         }
         let _ = std::fs::remove_dir_all(dir);
     }
+
+    /// пауза останавливает копирование между кусками, снятие — продолжает, отмена будит даже стоящее на паузе
+    #[test]
+    fn a_paused_copy_stands_still_and_goes_on_when_resumed() {
+        let dir = nemo_px::paths::private_tmp("ops-pause").expect("tmp");
+        let src = dir.join("big");
+        let dst = dir.join("copy");
+        std::fs::write(&src, vec![7u8; 200 << 20]).unwrap();
+        let pause = Arc::new(AtomicBool::new(true));
+        let (s2, d2, p2) = (src.clone(), dst.clone(), pause.clone());
+        let h = std::thread::spawn(move || {
+            let send = |_: Ev| {};
+            let mut c = ctx(&send);
+            c.pause = p2;
+            copy_file(&mut c, &s2, &d2).is_ok()
+        });
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let at = std::fs::metadata(&dst).map(|m| m.len()).unwrap_or(0);
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let later = std::fs::metadata(&dst).map(|m| m.len()).unwrap_or(0);
+        assert_eq!(at, later, "no progress while paused");
+        assert!(later < 200 << 20, "not finished while paused");
+        pause.store(false, Ordering::Relaxed);
+        assert!(h.join().unwrap(), "finished after resuming");
+        assert_eq!(std::fs::metadata(&dst).unwrap().len(), 200 << 20);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn cancel_wakes_a_paused_copy_and_removes_the_half_file() {
+        let dir = nemo_px::paths::private_tmp("ops-pause-cancel").expect("tmp");
+        let src = dir.join("big");
+        let dst = dir.join("copy");
+        std::fs::write(&src, vec![1u8; 64 << 20]).unwrap();
+        let (pause, stop) = (Arc::new(AtomicBool::new(true)), Arc::new(AtomicBool::new(false)));
+        let (s2, d2, p2, st2) = (src.clone(), dst.clone(), pause.clone(), stop.clone());
+        let h = std::thread::spawn(move || {
+            let send = |_: Ev| {};
+            let mut c = ctx(&send);
+            c.pause = p2;
+            c.stop = st2;
+            let _ = copy_file(&mut c, &s2, &d2);
+        });
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        stop.store(true, Ordering::Relaxed);
+        h.join().unwrap();
+        assert!(!dst.exists(), "a cancelled copy leaves no half-written file");
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }
+

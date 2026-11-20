@@ -42,8 +42,13 @@ Checked again on 2026-11-20 against the code, not the old plan:
 
 - **Already there** (this note used to say they were missing): a breadcrumb path bar, an editable path (click the crumbs, Enter goes there or selects the
   file, Tab completes), a name filter, a recursive search, an info panel, a properties dialog, tabs and split view.
-- **Still missing:** batch rename, a storage view, an archive dialog with a preview of the contents, filters by file type, pause for a long copy,
-  right-to-left names.
+- **Added on 2026-11-20** (each with tests): batch rename (several selected files and F2: find and replace, case, numbers, text before and after, a live
+  preview, conflicts found before anything is renamed, a rename that can swap two names and puts everything back on a failure, one undo);
+  filters by file type in the filter field (`:images :video :audio :docs :archives :code :folders`, several mean "or"); the contents of an archive in the
+  info panel (read on a thread, first 5000 entries); pause and resume for a long copy, move, extract or compress (cancel still wakes a paused job and
+  removes the half-written file); «what takes the space» (size of every item of the folder, heaviest first, counted on a thread, click to go there).
+- **Still missing:** right-to-left names, a pause button for the file dialog's own copies (there are none), an archive dialog with choices of format
+  beyond the menu's.
 
 ## Next audit steps
 

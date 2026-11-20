@@ -467,9 +467,34 @@ impl App {
                 }
             }
             Act::Connect => fm.run(Cmd::Connect(String::new())),
-            Act::DlgFocus(n) => {
-                if let Some((Dlg::Server { field, .. }, _)) = &mut fm.dlg {
-                    *field = n;
+            Act::DlgFocus(n) => match &mut fm.dlg {
+                Some((Dlg::Server { field, .. }, _)) | Some((Dlg::Batch { field, .. }, _)) => *field = n,
+                _ => {}
+            },
+            Act::StorageGo(i) => {
+                // щелчок по строке: в эту папку (файл — к нему, в папке с ним)
+                let target = match &fm.dlg {
+                    Some((Dlg::Storage { dir, items, .. }, _)) => items.get(i).map(|it| (dir.join(&it.0), it.2)),
+                    _ => None,
+                };
+                if let Some((p, is_dir)) = target {
+                    fm.dlg_cancel();
+                    if is_dir {
+                        fm.go(p);
+                    } else {
+                        fm.vm().pending_sel = vec![p];
+                        fm.reload_all_of(&fm.v().dir.clone());
+                    }
+                }
+            }
+            Act::BatchCase => {
+                if let Some((Dlg::Batch { case, .. }, _)) = &mut fm.dlg {
+                    *case = case.next();
+                }
+            }
+            Act::BatchNum => {
+                if let Some((Dlg::Batch { num, .. }, _)) = &mut fm.dlg {
+                    *num = num.next();
                 }
             }
             Act::Item(p, i) => {
@@ -588,6 +613,12 @@ impl App {
                 if let Some(p) = &fm.pick {
                     let items: Vec<crate::fm::MItem> = p.filters.iter().enumerate().map(|(i, f)| crate::fm::MItem::new(&f.0, "", "", Cmd::PickFilter(i)).check(i == p.filter)).collect();
                     crate::menus::open(fm, items, x as i32, y as i32 - 10, "");
+                }
+            }
+            Act::JobPause(id) => {
+                if let Some(j) = fm.jobs.iter().find(|j| j.id == id) {
+                    let now = j.pause.load(std::sync::atomic::Ordering::Relaxed);
+                    j.pause.store(!now, std::sync::atomic::Ordering::Relaxed);
                 }
             }
             Act::JobCancel(id) => {

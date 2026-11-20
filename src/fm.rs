@@ -27,6 +27,7 @@ pub enum Msg {
     Thumb(PathBuf, i32, Option<Img>),
     Op(ops::Ev),
     Du { gen: u32, v: (u64, u64, u64), done: bool },
+    Storage { gen: u32, items: Vec<crate::storage::Item>, done: bool },
     Devices(Vec<Dev>),
     Mounted { err: Option<String>, open: Option<PathBuf> },
     /// итог `gio mount`: адрес и что вышло (и с чем пробовали — для повтора)
@@ -228,6 +229,8 @@ pub enum Cmd {
     DropCopy(Vec<PathBuf>, PathBuf),
     DropLink(Vec<PathBuf>, PathBuf),
     Search,
+    /// что занимает место в этой папке
+    Storage,
     PickFilter(usize),
 }
 
@@ -299,6 +302,10 @@ pub enum Dlg {
     /// подключение к серверу или телефону: адрес, логин, домен, пароль; `field` — где курсор;
     /// `question` — вопрос сервера (неизвестный ключ), `busy` — ждём gio
     Server { addr: Field, user: Field, pass: Field, field: u8, err: String, question: Option<String>, busy: bool },
+    /// «что занимает место»: папка, номер счёта, размеры дочерних (по убыванию), досчитано ли, остановка, место на диске
+    Storage { dir: PathBuf, gen: u32, items: Vec<crate::storage::Item>, done: bool, stop: Arc<AtomicBool>, free: Option<(u64, u64)> },
+    /// пакетное переименование: выделенные (путь, папка ли); поля «найти», «заменить на», «в начало», «в конец»; где курсор; правила
+    Batch { items: Vec<(PathBuf, bool)>, f: Vec<Field>, field: u8, case: crate::batch::Case, num: crate::batch::Num, err: String },
     /// пароль зашифрованного диска (LUKS, BitLocker): раздел, его имя для заголовка
     Unlock { dev: String, name: String, pass: Field, err: String, busy: bool },
 }
@@ -310,6 +317,7 @@ pub struct Job {
     pub total: u64,
     pub name: String,
     pub stop: Arc<AtomicBool>,
+    pub pause: Arc<AtomicBool>,
 }
 
 pub enum Undo {
@@ -812,11 +820,13 @@ pub(crate) fn count_text(t: &[PathBuf]) -> String {
 /// отсортировать и отфильтровать: скрытые, строка фильтра, фильтр диалога
 pub fn refilter(v: &mut View, cfg: &Cfg, pick: Option<&Vec<Pat>>) {
     fsx::sort(&mut v.all, Sort::from_id(&cfg.sort), cfg.desc, cfg.folders_first);
-    let q = v.filter.to_lowercase();
+    // строка фильтра: часть имени и, если есть, виды файлов («:картинки :видео»)
+    let (kinds, text) = crate::kinds::parse_query(&v.filter);
+    let q = text.to_lowercase();
     v.items = (0..v.all.len())
         .filter(|&i| {
             let e = &v.all[i];
-            (cfg.hidden || !e.hidden || v.trash) && (q.is_empty() || e.name.to_lowercase().contains(&q)) && (e.dir || pick.map(|p| matches(e, p)).unwrap_or(true))
+            (cfg.hidden || !e.hidden || v.trash) && crate::kinds::matches(e, &kinds, &q) && (e.dir || pick.map(|p| matches(e, p)).unwrap_or(true))
         })
         .collect();
 }

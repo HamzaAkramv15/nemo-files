@@ -243,7 +243,7 @@ pub(crate) fn toolbar(ui: &mut Ui, fm: &Fm, r: R) {
         ui.cv.pxbox(fr, &BoxStyle::new(t.code_bg, if fm.focus == crate::fm::Focus::Filter { t.red } else { t.border }));
         ui.cv.icon("search", fr.x + 8, fr.cy() - 7, 2, t.text_faint);
         let inner = R::new(fr.x + 28, fr.y, fr.w - 54, fr.h);
-        field_text(ui, inner, &fm.filter_f, "фильтр по имени", fm.focus == crate::fm::Focus::Filter);
+        field_text(ui, inner, &fm.filter_f, "имя или :картинки :видео :код", fm.focus == crate::fm::Focus::Filter);
         ui.zone(fr, Act::FilterField, Cur::Text);
         if !fm.filter_f.text.is_empty() {
             ui.button(R::new(fr.right() - 24, fr.y + 5, 20, 20), "", "close", Tone::Ghost, false, true, Act::FilterClear);
@@ -677,6 +677,40 @@ pub(crate) fn info(ui: &mut Ui, fm: &Fm, r: R) {
             kv(ui, "ссылка на", &tg.display().to_string());
         }
     }
+    // архив: что внутри (верхний уровень), не распаковывая; список читается в нити, пока ждём — кадры идут
+    if !e.dir && crate::kinds::is_kind("archive", e) {
+        y += 6;
+        ui.cv.fill(R::new(x, y, w, 1), t.border);
+        y += 10;
+        match crate::archive::get(&e.path) {
+            crate::archive::Prev::Loading => {
+                ui.anim = true;
+                ui.text_in(PX, R::new(x, y, w, 18), "читаю архив…", t.text_faint);
+            }
+            crate::archive::Prev::Failed(m) => {
+                ui.text_in(PX, R::new(x, y, w, 18), "архив не читается", t.warn);
+                if !m.is_empty() {
+                    raw(ui, PX, R::new(x, y + 18, w, 18), &m, t.text_faint);
+                }
+            }
+            crate::archive::Prev::Done(s) => {
+                let total = if s.more { format!("{}+", s.total) } else { s.total.to_string() };
+                ui.text_in(PX, R::new(x, y, 90, 18), "внутри", t.text_faint);
+                raw(ui, PX, R::new(x + 92, y, w - 92, 18), &crate::tf!("записей: {}", "entries: {}", "entradas: {}", total), t.text_dim);
+                y += 24;
+                let room = ((r.bottom() - y - 12) / 18).max(0) as usize;
+                for (name, dir) in s.top.iter().take(room.saturating_sub(1).min(14)) {
+                    ui.cv.icon(if *dir { "folder" } else { "copy" }, x, y + 2, 1, t.text_faint);
+                    raw(ui, PX, R::new(x + 18, y, w - 18, 18), &if *dir { format!("{name}/") } else { name.clone() }, t.text_dim);
+                    y += 18;
+                }
+                if s.top.len() > room.saturating_sub(1).min(14) {
+                    ui.text_in(PX, R::new(x, y, w, 18), "…и другое", t.text_faint);
+                }
+            }
+        }
+        return;
+    }
     // начало текстового файла — моноширинно не нужно: пиксельный шрифт и так ровный
     let k = mime::kind(e.mime);
     if matches!(k, Kind::Text | Kind::Code) && e.size < 2_000_000 {
@@ -752,10 +786,17 @@ pub(crate) fn status(ui: &mut Ui, fm: &Fm, r: R) {
             crate::ops::Kind::Restore => "возвращаю",
             crate::ops::Kind::Link => "ссылки",
         };
-        let lw = ui.text_in(PX, R::new(jx, r.y, 110, r.h), what, t.text);
+        let paused = j.pause.load(std::sync::atomic::Ordering::Relaxed);
+        let lw = ui.text_in(PX, R::new(jx, r.y, 110, r.h), if paused { "на паузе" } else { what }, if paused { t.warn } else { t.text });
         let gx = jx + lw + 8;
+        // пауза — у долгих дел, где есть что остановить: копирование, перенос, распаковка, сжатие
+        let can_pause = matches!(j.kind, crate::ops::Kind::Copy | crate::ops::Kind::Move | crate::ops::Kind::Extract | crate::ops::Kind::Compress);
+        let bar_w = jw - lw - if can_pause { 66 } else { 40 };
         let k = if j.total > 0 { j.done as f32 / j.total as f32 } else { ((fm.born.elapsed().as_millis() / 120) % 12) as f32 / 12.0 };
-        ui.cv.gauge(R::new(gx, r.cy() - 4, jw - lw - 40, 8), 14, k, t.ember, t.surface.lerp(t.border, 0.4), 1);
+        ui.cv.gauge(R::new(gx, r.cy() - 4, bar_w, 8), 14, k, if paused { t.warn } else { t.ember }, t.surface.lerp(t.border, 0.4), 1);
+        if can_pause {
+            ui.button(R::new(jx + jw - 52, r.y + 3, 20, r.h - 6), "", if paused { "play" } else { "pause" }, Tone::Ghost, paused, true, Act::JobPause(j.id));
+        }
         ui.button(R::new(jx + jw - 26, r.y + 3, 20, r.h - 6), "", "close", Tone::Ghost, false, true, Act::JobCancel(j.id));
         ui.anim = true;
     }

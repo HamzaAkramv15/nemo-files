@@ -339,7 +339,7 @@ impl App {
             self.dirty = true;
         }
         // мигание курсора в полях
-        let typing = self.fm.focus != Focus::Content || self.fm.dlg.as_ref().map(|d| matches!(d.0, Dlg::Name { .. } | Dlg::OpenWith { .. } | Dlg::Server { .. } | Dlg::Unlock { .. })).unwrap_or(false) || self.fm.v().rename.is_some() || self.fm.pick.as_ref().map(|p| p.name_focus).unwrap_or(false);
+        let typing = self.fm.focus != Focus::Content || self.fm.dlg.as_ref().map(|d| matches!(d.0, Dlg::Name { .. } | Dlg::OpenWith { .. } | Dlg::Server { .. } | Dlg::Unlock { .. } | Dlg::Batch { .. })).unwrap_or(false) || self.fm.v().rename.is_some() || self.fm.pick.as_ref().map(|p| p.name_focus).unwrap_or(false);
         if typing && self.blink_at.elapsed().as_millis() > 530 {
             self.blink = !self.blink;
             self.blink_at = Instant::now();
@@ -390,6 +390,7 @@ impl App {
                 Msg::Thumb(p, s, img) => self.fm.put_thumb((p, s), img),
                 Msg::Op(e) => self.fm.on_op(e),
                 Msg::Du { gen, v, done } => self.fm.on_du(gen, v, done),
+                Msg::Storage { gen, items, done } => self.fm.on_storage(gen, items, done),
                 Msg::Devices(d) => {
                     if d != self.fm.devs {
                         self.fm.devs = d;

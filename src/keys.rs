@@ -481,6 +481,18 @@ impl Fm {
                     }
                 }
             }
+            Dlg::Batch { f, field, case, num, err, .. } => match k.sym {
+                Keysym::Tab | Keysym::Down => *field = (*field + 1) % 4,
+                Keysym::ISO_Left_Tab | Keysym::Up => *field = (*field + 3) % 4,
+                // регистр и номера — и клавишами: F3, F4
+                Keysym::F3 => *case = case.next(),
+                Keysym::F4 => *num = num.next(),
+                _ => {
+                    if edit(&mut f[*field as usize], k) {
+                        err.clear();
+                    }
+                }
+            },
             Dlg::Unlock { pass, err, busy, .. } => {
                 if !*busy && edit(pass, k) {
                     err.clear();

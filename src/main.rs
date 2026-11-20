@@ -13,9 +13,12 @@
 //   nemo-files shot [ЦЕЛЬ…] [--lang en] [-o ПАПКА]   снимки окна в PNG без Wayland
 
 mod setup;
+mod storage;
 mod act;
 mod app;
+mod archive;
 mod ask;
+mod batch;
 mod cfg;
 mod cmds;
 mod devices;
@@ -25,6 +28,7 @@ mod fm;
 mod fsx;
 mod i18n;
 mod keys;
+mod kinds;
 mod mouse;
 mod nav;
 mod menus;

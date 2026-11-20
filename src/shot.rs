@@ -11,7 +11,7 @@ use crate::icons::Icons;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-const TARGETS: &[&str] = &["grid", "list", "split", "info", "menu", "menu-bg", "main-menu", "props", "settings", "new-folder", "conflict", "open-with", "pick-save", "pick-open", "trash", "rename", "empty", "icons", "server", "places", "drag", "unlock"];
+const TARGETS: &[&str] = &["grid", "list", "split", "info", "menu", "menu-bg", "main-menu", "props", "settings", "new-folder", "conflict", "open-with", "pick-save", "pick-open", "trash", "rename", "batch", "filter", "archive", "storage", "empty", "icons", "server", "places", "drag", "unlock"];
 
 fn fixture(root: &Path) {
     let _ = std::fs::remove_dir_all(root);
@@ -218,6 +218,45 @@ pub fn run(args: &[String]) -> i32 {
             "rename" => {
                 pick_cur(&mut fm, "notes.txt");
                 fm.start_rename();
+            }
+            "batch" => {
+                // несколько выделенных: окно пакетного переименования с заполненными полями
+                let v = fm.vm();
+                v.sel = v.all.iter().filter(|e| !e.dir && matches!(e.name.as_str(), "backup.tar.zst" | "notes.txt" | "report-2026.pdf" | "song.flac")).map(|e| e.path.clone()).collect();
+                fm.start_rename();
+                if let Some((crate::fm::Dlg::Batch { f, num, case, .. }, _)) = &mut fm.dlg {
+                    f[0].set("-2026");
+                    f[1].set("");
+                    f[2].set("doc_");
+                    *num = crate::batch::Num::After;
+                    *case = crate::batch::Case::Lower;
+                }
+            }
+            "storage" => {
+                let stop = std::sync::atomic::AtomicBool::new(false);
+                let mut items = vec![];
+                crate::storage::scan(&root, &stop, |i, _| items = i.to_vec());
+                let free = crate::fsx::disk_free(&root);
+                fm.dlg = Some((crate::fm::Dlg::Storage { dir: root.clone(), gen: 0, items, done: true, stop: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)), free }, std::time::Instant::now()));
+            }
+            "filter" => {
+                // фильтр по виду: картинки и музыка
+                fm.filter_f.set(":картинки :музыка"); // i18n-ok
+                fm.apply_filter();
+            }
+            "archive" => {
+                // настоящий архив из демо-папки: список читается нитью, ждём его до рисования
+                let tar = root.join("projects.tar");
+                let _ = std::process::Command::new("bsdtar").current_dir(&root).args(["-cf", "projects.tar", "notes.txt", "README.md", "проекты"]).status(); // i18n-ok
+                for _ in 0..40 {
+                    if crate::archive::get(&tar) != crate::archive::Prev::Loading {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                fm.reload_all_of(&root);
+                fm.cfg.info = true;
+                pick_cur(&mut fm, "projects.tar");
             }
             "empty" => {
                 let d = root.join("музыка"); // i18n-ok

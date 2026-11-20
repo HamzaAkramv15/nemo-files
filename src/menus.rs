@@ -87,7 +87,7 @@ pub fn for_items(fm: &mut Fm) -> Vec<MItem> {
         m.push(MItem::new("вставить сюда", "down", "", Cmd::PasteInto(first.path.clone())));
     }
     m.push(MItem::new("копировать путь", "", "ctrl+alt+c", Cmd::CopyPath));
-    m.push(MItem::new("переименовать", "", "f2", Cmd::Rename).off(!one));
+    m.push(MItem::new(if one { "переименовать" } else { "переименовать все…" }, "", "f2", Cmd::Rename));
     m.push(MItem::sep());
     let k = mime::kind(first.mime);
     if one && k == Kind::Archive {
@@ -145,6 +145,7 @@ pub fn main_menu(fm: &mut Fm) -> Vec<MItem> {
         MItem::sub("вид", "eye", view_items(fm)),
         MItem::new("поиск", "search", "ctrl+f", Cmd::Search),
         MItem::new("корзина", "trash", "", Cmd::GoTrash),
+        MItem::new("что занимает место", "gauge", "", Cmd::Storage),
         MItem::sep(),
         MItem::new("отменить", "left", "ctrl+z", Cmd::Undo).off(fm.undo.is_empty()),
         MItem::new("настройки", "gear", "ctrl+,", Cmd::Settings),

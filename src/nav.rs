@@ -6,6 +6,7 @@ use crate::fsx;
 use crate::ui::Field;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::Instant;
 
 impl Fm {
     // ── переходы ───────────────────────────────────────────────────────────
@@ -263,6 +264,16 @@ impl Fm {
 
     // ── переименование на месте ────────────────────────────────────────────
     pub fn start_rename(&mut self) {
+        // несколько выделенных — пакетное переименование
+        let many: Vec<(PathBuf, bool)> = {
+            let v = self.v();
+            if v.trash { vec![] } else { v.selected().iter().map(|e| (e.path.clone(), e.dir)).collect() }
+        };
+        if many.len() >= 2 {
+            let f = (0..4).map(|_| Field::default()).collect();
+            self.dlg = Some((Dlg::Batch { items: many, f, field: 0, case: crate::batch::Case::Keep, num: crate::batch::Num::Off, err: String::new() }, Instant::now()));
+            return;
+        }
         let v = self.vm();
         if v.trash {
             return;

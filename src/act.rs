@@ -25,6 +25,9 @@ pub enum Act {
     Connect,
     /// поле окна подключения: 0 адрес, 1 логин, 2 пароль
     DlgFocus(u8),
+    BatchCase,
+    StorageGo(usize),
+    BatchNum,
     Item(usize, usize),
     Bg(usize),
     Bar(usize),
@@ -54,6 +57,7 @@ pub enum Act {
     PickName,
     PickFilter,
     JobCancel(u32),
+    JobPause(u32),
     Toast,
     Drag,
     Dim,

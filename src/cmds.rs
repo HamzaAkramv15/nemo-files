@@ -86,6 +86,7 @@ impl Fm {
             }
             Cmd::PasteInto(d) => self.fx.push(Fx::Paste(d)),
             Cmd::Rename => self.start_rename(),
+            Cmd::Storage => self.open_storage(),
             Cmd::Trash => {
                 if self.v().trash {
                     self.run(Cmd::Delete);
@@ -336,8 +337,9 @@ impl Fm {
         self.next_job += 1;
         let id = self.next_job;
         let stop = Arc::new(AtomicBool::new(false));
-        self.jobs.push(Job { id, kind, done: 0, total: 0, name: String::new(), stop: stop.clone() });
-        let job = ops::Job { id, kind, srcs, dst, name, stop };
+        let pause = Arc::new(AtomicBool::new(false));
+        self.jobs.push(Job { id, kind, done: 0, total: 0, name: String::new(), stop: stop.clone(), pause: pause.clone() });
+        let job = ops::Job { id, kind, srcs, dst, name, stop, pause };
         match &self.tx {
             Some(tx) => {
                 let tx = tx.clone();

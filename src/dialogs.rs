@@ -101,6 +101,87 @@ pub(crate) fn dialog(ui: &mut Ui, fm: &Fm, d: &Dlg, born: Instant, w: i32, h: i3
             buttons(ui, r, &[("отмена", "cancel", Tone::Plain), (if question.is_some() { "подключиться всё равно" } else { "подключить" }, "ok", Tone::Primary)]);
             dissolve_dlg(ui, fm, born, r);
         }
+        Dlg::Storage { dir, items, done, free, .. } => {
+            let r = dlg_frame(ui, fm, born, w, h, 600, 480, "gauge", "что занимает место");
+            let lx = r.x + 16;
+            let iw = r.w - 32;
+            let total: u64 = items.iter().map(|i| i.1).sum();
+            raw(ui, PX, R::new(lx, r.y + 46, iw, 18), &crate::fsx::pretty(dir), t.text);
+            let sum = if *done { crate::tf!("всего {}", "total {}", "total {}", crate::fsx::human(total)) } else { crate::tf!("считаю… {}", "counting… {}", "contando… {}", crate::fsx::human(total)) };
+            let free_s = free.map(|(f, _)| crate::tf!("  ·  свободно на диске {}", "  ·  {} free on the disk", "  ·  {} livres no disco", crate::fsx::human(f))).unwrap_or_default();
+            raw(ui, PX, R::new(lx, r.y + 66, iw, 18), &format!("{sum}{free_s}"), t.text_dim);
+            if !*done {
+                ui.anim = true;
+            }
+            let max = items.first().map(|i| i.1).unwrap_or(0);
+            let mut y = r.y + 96;
+            let rows = ((r.bottom() - 60 - y) / 28).max(0) as usize;
+            for (i, (name, size, is_dir)) in items.iter().take(rows).enumerate() {
+                let row = R::new(lx, y, iw, 26);
+                let hov = ui.hover(row);
+                if hov {
+                    ui.cv.fill(row, t.surface_hi.alpha(0.6));
+                }
+                ui.cv.icon(if *is_dir { "folder" } else { "copy" }, row.x + 4, row.y + 5, 1, t.text_faint);
+                let nw = 200;
+                let nm = ui.f.elide(PX, name, nw);
+                raw(ui, PX, R::new(row.x + 24, row.y + 4, nw, 18), &nm, t.text);
+                let bx = row.x + 24 + nw + 8;
+                let bw = iw - 24 - nw - 8 - 86;
+                ui.cv.fill(R::new(bx, row.y + 9, bw, 8), t.surface.lerp(t.border, 0.4));
+                let fill = (bw as f32 * crate::storage::share(*size, max)).round() as i32;
+                ui.cv.fill(R::new(bx, row.y + 9, fill.max(if *size > 0 { 2 } else { 0 }), 8), if *is_dir { t.red } else { t.ember });
+                ui.cv.text_right(ui.f, PX, R::new(row.right() - 80, row.y + 4, 76, 18), &crate::fsx::human(*size), t.text_dim);
+                ui.zone(row, Act::StorageGo(i), Cur::Pointer);
+                y += 28;
+            }
+            if items.len() > rows && rows > 0 {
+                raw(ui, PX, R::new(lx, y, iw, 18), &format!("… +{}", items.len() - rows), t.text_faint);
+            }
+            buttons(ui, r, &[("закрыть", "ok", Tone::Primary)]);
+            dissolve_dlg(ui, fm, born, r);
+        }
+        Dlg::Batch { items, f, field, case, num, err } => {
+            let r = dlg_frame(ui, fm, born, w, h, 580, 500, "copy", "переименовать несколько файлов");
+            let lx = r.x + 16;
+            let fx = r.x + 130;
+            let fw = r.right() - 16 - fx;
+            let mut y = r.y + 48;
+            let rows: [(&str, &str); 4] = [("найти", "что заменить в имени"), ("заменить на", "чем (можно пусто)"), ("в начало", "приписка перед именем"), ("в конец", "приписка после имени")];
+            for (n, (label, ph)) in rows.into_iter().enumerate() {
+                ui.text_in(PX, R::new(lx, y, 110, 30), label, t.text_dim);
+                ui.field(R::new(fx, y, fw, 30), &f[n], ph, *field as usize == n, false, Act::DlgFocus(n as u8));
+                y += 36;
+            }
+            let half = (r.w - 32 - 10) / 2;
+            let case_l = format!("{}: {}", crate::i18n::tr("регистр"), crate::i18n::tr(case.label()));
+            let num_l = format!("{}: {}", crate::i18n::tr("номера"), crate::i18n::tr(num.label()));
+            ui.button(R::new(lx, y, half, 28), &case_l, "", Tone::Plain, false, true, Act::BatchCase);
+            ui.button(R::new(lx + half + 10, y, half, 28), &num_l, "", Tone::Plain, false, true, Act::BatchNum);
+            y += 38;
+            // что получится: пока человек печатает
+            let rule = crate::batch::Rule { find: f[0].text.clone(), replace: f[1].text.clone(), prefix: f[2].text.clone(), suffix: f[3].text.clone(), case: *case, num: *num };
+            let (old, new, probs) = crate::batch::preview(items, &rule);
+            let changed = (0..old.len()).filter(|&i| old[i] != new[i]).count();
+            let colw = (r.w - 32 - 24) / 2;
+            for i in 0..old.len().min(7) {
+                let bad = probs[i].is_some();
+                let col = if bad { t.warn } else if old[i] == new[i] { t.text_faint } else { t.text };
+                let a = ui.f.elide(PX, &old[i], colw);
+                raw(ui, PX, R::new(lx, y, colw, 18), &a, t.text_dim);
+                ui.cv.icon("right", lx + colw + 4, y + 2, 1, t.text_faint);
+                let b = ui.f.elide(PX, &new[i], colw);
+                raw(ui, PX, R::new(lx + colw + 24, y, colw, 18), &b, col);
+                y += 19;
+            }
+            if old.len() > 7 {
+                raw(ui, PX, R::new(lx, y, r.w - 32, 18), &format!("… +{}", old.len() - 7), t.text_faint);
+            }
+            let status = if !err.is_empty() { (err.clone(), t.warn) } else { (crate::tf!("изменится: {} из {} · F3 регистр · F4 номера · Tab поля", "will change: {} of {} · F3 case · F4 numbers · Tab fields", "vai mudar: {} de {} · F3 maiúsculas · F4 números · Tab campos", changed, old.len()), t.text_faint) };
+            raw(ui, PX, R::new(lx, r.bottom() - 74, r.w - 32, 20), &status.0, status.1);
+            buttons(ui, r, &[("отмена", "cancel", Tone::Plain), ("переименовать", "ok", Tone::Primary)]);
+            dissolve_dlg(ui, fm, born, r);
+        }
         Dlg::Unlock { name, pass, err, busy, .. } => {
             let r = dlg_frame(ui, fm, born, w, h, 460, 210, "lock", "зашифрованный диск");
             raw(ui, PX, R::new(r.x + 16, r.y + 48, r.w - 32, 20), name, t.text);
