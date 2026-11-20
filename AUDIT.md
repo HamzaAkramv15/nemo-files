@@ -38,8 +38,12 @@ Tests were 6; they are now 10.
 
 ## Gaps against the plan
 
-No batch rename, no breadcrumb path bar, no search, no storage view, no archive dialog, no right-to-left names. These are the
-planned upgrades (`~/nemo/06`), and each needs its own design and tests.
+Checked again on 2026-11-20 against the code, not the old plan:
+
+- **Already there** (this note used to say they were missing): a breadcrumb path bar, an editable path (click the crumbs, Enter goes there or selects the
+  file, Tab completes), a name filter, a recursive search, an info panel, a properties dialog, tabs and split view.
+- **Still missing:** batch rename, a storage view, an archive dialog with a preview of the contents, filters by file type, pause for a long copy,
+  right-to-left names.
 
 ## Next audit steps
 
