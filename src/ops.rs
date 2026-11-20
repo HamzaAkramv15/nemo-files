@@ -150,6 +150,15 @@ fn temp_name(dir: &Path, name: &str) -> PathBuf {
 fn settle(c: &mut Ctx, swap: Option<(PathBuf, PathBuf)>, ok: bool, d: &Path) -> PathBuf {
     let Some((tmp, fin)) = swap else { return d.to_path_buf() };
     if ok {
+        // замена не стирает старый файл: он уходит в корзину и его можно вернуть. Корзины на этом диске нет (телефон,
+        // сеть) — заменяем, как человек и выбрал в окне; корзина есть, но не приняла файл — не заменяем вовсе
+        if std::fs::symlink_metadata(&fin).is_ok() {
+            if let Err(nemo_px::trash::PutErr::Io(e)) = nemo_px::trash::put(&fin) {
+                c.errors.push(format!("{}: {}", fin.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(), crate::tf!("прежний файл не удалось убрать в корзину, замены нет: {}", "the old file could not go to the trash, not replaced: {}", "o arquivo antigo não foi para a lixeira, não substituído: {}", crate::fsx::err_text(&e))));
+                let _ = std::fs::remove_file(&tmp);
+                return fin;
+            }
+        }
         match std::fs::rename(&tmp, &fin) {
             Ok(()) => return fin,
             Err(e) => c.err(&fin, &e),
@@ -552,5 +561,31 @@ mod tests {
         assert_eq!(std::fs::read(b.join("f")).unwrap(), b"new");
         assert_eq!(std::fs::read_dir(&b).unwrap().count(), 1);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// замена файла файлом: прежний уходит в корзину и лежит там целым, новый встаёт на его место
+    #[test]
+    fn a_replaced_file_goes_to_the_trash_whole() {
+        let dir = nemo_px::paths::private_tmp("ops-replace").expect("tmp");
+        // своя корзина: XDG_DATA_HOME на время проверки (другие проверки этого крейта не читают корзину)
+        let old_home = std::env::var_os("XDG_DATA_HOME");
+        std::env::set_var("XDG_DATA_HOME", dir.join("share"));
+        let (fin, tmp) = (dir.join("doc.txt"), dir.join(".doc.txt.nemo-part-1"));
+        std::fs::write(&fin, "old contents").unwrap();
+        std::fs::write(&tmp, "new contents").unwrap();
+        let send = |_: Ev| {};
+        let mut c = ctx(&send);
+        let r = settle(&mut c, Some((tmp.clone(), fin.clone())), true, &fin);
+        assert_eq!(r, fin);
+        assert!(c.errors.is_empty(), "{:?}", c.errors);
+        assert_eq!(std::fs::read_to_string(&fin).unwrap(), "new contents");
+        let files = dir.join("share/Trash/files");
+        let kept: Vec<String> = std::fs::read_dir(&files).map(|d| d.flatten().map(|e| std::fs::read_to_string(e.path()).unwrap_or_default()).collect()).unwrap_or_default();
+        assert_eq!(kept, vec!["old contents".to_string()], "the old file is in the trash, unchanged");
+        match old_home {
+            Some(v) => std::env::set_var("XDG_DATA_HOME", v),
+            None => std::env::remove_var("XDG_DATA_HOME"),
+        }
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

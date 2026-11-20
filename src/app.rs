@@ -33,7 +33,7 @@ use smithay_client_toolkit::{
         },
         WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm},
+    shm::{slot::{Slot, SlotPool}, Shm},
 };
 use std::io::Read;
 use std::path::PathBuf;
@@ -107,6 +107,12 @@ pub struct App {
     pub(crate) enter_serial: u32,
     pub(crate) kb_serial: u32,
     pub(crate) pool: Option<SlotPool>,
+    /// два места под кадры, закреплённые за приложением (пул не растёт), размер кадра, время последней отрисовки и очищены ли
+    /// страницы отпущенных мест (trim_ring)
+    pub(crate) ring: Vec<Slot>,
+    pub(crate) ring_need: usize,
+    pub(crate) last_draw: Instant,
+    pub(crate) trimmed: bool,
     pub(crate) w: i32,
     pub(crate) h: i32,
     pub(crate) configured: bool,
@@ -221,6 +227,10 @@ pub fn run(fm_init: impl FnOnce(Option<calloop::channel::Sender<Msg>>) -> Fm) ->
         enter_serial: 0,
         kb_serial: 0,
         pool: None,
+        ring: vec![],
+        ring_need: 0,
+        last_draw: Instant::now(),
+        trimmed: true,
         w,
         h,
         configured: false,
@@ -288,7 +298,30 @@ pub fn run(fm_init: impl FnOnce(Option<calloop::channel::Sender<Msg>>) -> Fm) ->
 }
 
 impl App {
+    /// окно две секунды не рисуется: страницы мест кадра, которые сервер отпустил, — назад системе (MADV_REMOVE на общей
+    /// памяти). Экран не меняется; следующий кадр целиком пишется заново. Занятое сервером место не трогается
+    fn trim_ring(&mut self) {
+        if self.trimmed || self.dirty || self.anim || self.last_draw.elapsed() < Duration::from_secs(2) {
+            return;
+        }
+        self.trimmed = true;
+        let Some(pool) = self.pool.as_mut() else { return };
+        for s in &self.ring {
+            if s.has_active_buffers() {
+                self.trimmed = false;
+                continue;
+            }
+            let raw = pool.raw_data_mut(s);
+            let (p, l) = (raw.as_mut_ptr() as usize, raw.len());
+            let (a, b) = ((p + 4095) & !4095, (p + l) & !4095);
+            if b > a {
+                unsafe { libc::madvise(a as *mut libc::c_void, b - a, libc::MADV_REMOVE) };
+            }
+        }
+    }
+
     pub(crate) fn tick(&mut self) {
+        self.trim_ring();
         // окно закрыли — следующее из очереди заданий
         if self.fm.next_dlg() {
             self.dirty = true;
@@ -533,11 +566,34 @@ impl App {
         let (pw, ph) = if self.hidpi.is_none() || self.scale == 1.0 { (w, h) } else { nemo_px::gfx::phys(w, h, self.scale) };
         let up = (pw, ph) != (w, h);
         let need = (pw * ph * 4) as usize;
-        if self.pool.as_ref().map(|p| p.len() < need).unwrap_or(true) {
+        if self.pool.is_none() || self.ring_need != need {
+            // окно другого размера — новый пул из двух мест ровно под кадр
+            self.ring.clear();
             self.pool = SlotPool::new(need * 2, &self.shm).ok();
+            self.ring_need = need;
+            if let Some(p) = self.pool.as_mut() {
+                for _ in 0..2 {
+                    if let Ok(s) = p.new_slot(need) {
+                        self.ring.push(s);
+                    }
+                }
+            }
         }
         let Some(pool) = self.pool.as_mut() else { return };
-        let Ok((buffer, bytes)) = pool.create_buffer(pw, ph, pw * 4, wl_shm::Format::Argb8888) else { return };
+        // кадр рисуется в место, которое сервер уже отпустил; оба заняты — обычный путь (пул может вырасти)
+        let free = self.ring.iter().find(|s| !s.has_active_buffers()).cloned();
+        let (buffer, bytes) = match free {
+            Some(slot) => {
+                let Ok(b) = pool.create_buffer_in(&slot, pw, ph, pw * 4, wl_shm::Format::Argb8888) else { return };
+                (b, pool.raw_data_mut(&slot))
+            }
+            None => {
+                let Ok(r) = pool.create_buffer(pw, ph, pw * 4, wl_shm::Format::Argb8888) else { return };
+                r
+            }
+        };
+        self.last_draw = Instant::now();
+        self.trimmed = false;
         let (out_ptr, out_len) = (bytes.as_mut_ptr() as *mut u32, bytes.len() / 4);
         let mut scratch = std::mem::take(&mut self.scratch);
         let buf: &mut [u32] = if up {
