@@ -124,11 +124,9 @@ impl App {
                 self.after_input();
             }
             PointerEventKind::Axis { vertical, .. } => {
-                let d = if vertical.discrete != 0 { vertical.discrete as f64 } else if vertical.value120 != 0 { vertical.value120 as f64 / 120.0 } else { vertical.absolute / 15.0 };
-                if d.abs() < 0.01 {
-                    return;
-                }
-                self.on_wheel(x, y, d);
+                // щелчок колеса — прежний шаг; тачпад — пиксели, список едет за пальцем (nemo_px::wheel)
+                let Some(sc) = nemo_px::wheel::scroll_of(vertical.discrete, vertical.value120, vertical.absolute) else { return };
+                self.on_wheel(x, y, sc);
                 self.after_input();
             }
         }
@@ -399,16 +397,26 @@ impl App {
         self.press = None;
     }
 
-    pub(crate) fn on_wheel(&mut self, x: f64, y: f64, d: f64) {
+    pub(crate) fn on_wheel(&mut self, x: f64, y: f64, sc: nemo_px::wheel::Scroll) {
+        use nemo_px::wheel::Scroll;
+        // сдвиг в пикселях: щелчок — `notch` пикселей, тачпад — сколько пальцем
+        let px = |notch: f64| match sc {
+            Scroll::Notches(n) => n * notch,
+            Scroll::Pixels(p) => p,
+        };
         if self.fm.menu.is_some() {
             return;
         }
         if self.mods.ctrl {
-            self.fm.run(Cmd::Zoom(if d < 0.0 { 1 } else { -1 }));
+            // масштаб — целыми шагами: тачпад копится до порога
+            let n = self.wheel.feed(sc);
+            if n != 0 {
+                self.fm.run(Cmd::Zoom(if n < 0 { 1 } else { -1 }));
+            }
             return;
         }
         if let Some((Dlg::OpenWith { scroll, .. }, _)) = &mut self.fm.dlg {
-            *scroll = (*scroll + (d * 60.0) as i32).max(0);
+            *scroll = (*scroll + px(60.0) as i32).max(0);
             return;
         }
         if self.fm.dlg.is_some() {
@@ -418,7 +426,7 @@ impl App {
         let l = draw::lay(&self.fm, self.w, self.h);
         if let Some(sr) = l.side.filter(|r| r.contains(x, y)) {
             let max = (self.fm.side_h.get() - sr.h).max(0);
-            self.fm.side_scroll = (self.fm.side_scroll + (d * 40.0) as i32).clamp(0, max);
+            self.fm.side_scroll = (self.fm.side_scroll + px(40.0) as i32).clamp(0, max);
             return;
         }
         let Some(pi) = self.pane_at(x, y) else { return };
@@ -427,7 +435,7 @@ impl App {
         let ms = draw::max_scroll(&self.fm, v);
         let step = if self.fm.mode() == crate::fm::Mode::Grid { g.ch as f32 * 0.75 } else { g.ch as f32 * 3.0 };
         let Some(v) = self.fm.pane_m(pi) else { return };
-        v.target = (v.target + d as f32 * step).clamp(0.0, ms);
+        v.target = (v.target + px(step as f64) as f32).clamp(0.0, ms);
     }
 
     pub(crate) fn on_click(&mut self, a: Act, button: u32, x: f64, y: f64, double: bool) {

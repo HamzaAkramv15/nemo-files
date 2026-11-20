@@ -112,6 +112,8 @@ pub struct App {
     pub(crate) ring: Vec<Slot>,
     pub(crate) ring_need: usize,
     pub(crate) last_draw: Instant,
+    /// копилка шагов колеса и тачпада (nemo_px::wheel)
+    pub(crate) wheel: nemo_px::wheel::Steps,
     pub(crate) trimmed: bool,
     pub(crate) w: i32,
     pub(crate) h: i32,
@@ -230,6 +232,7 @@ pub fn run(fm_init: impl FnOnce(Option<calloop::channel::Sender<Msg>>) -> Fm) ->
         ring: vec![],
         ring_need: 0,
         last_draw: Instant::now(),
+        wheel: Default::default(),
         trimmed: true,
         w,
         h,
