@@ -82,6 +82,7 @@ org.freedesktop.impl.portal.FileChooser=nemo;gtk;
 | Ctrl+1, Ctrl+2, Ctrl+= and Ctrl+- | grid, list, bigger and smaller icons |
 | F4, F5, F9, F11 | terminal here, reload, sidebar, details |
 | Backspace, Alt+arrows | up, back and forward |
+| Space | quick look: a picture opens in nemo-view (the arrows there page through the folder) |
 
 ## Settings
 

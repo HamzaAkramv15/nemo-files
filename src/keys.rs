@@ -241,6 +241,14 @@ impl Fm {
                     self.activate(i);
                 }
             }
+            // Quick Look: Space on a picture opens it in nemo-view (arrows there go through the folder's pictures); other files do nothing
+            Keysym::space if !c && !a && self.pick.is_none() && !self.v().trash => {
+                if let Some(e) = self.v().cur.and_then(|i| self.v().item(i).cloned()) {
+                    if !e.dir && crate::mime::kind(e.mime) == crate::mime::Kind::Image {
+                        crate::fm::spawn(&["nemo-view".to_string(), e.path.to_string_lossy().into_owned()], e.path.parent());
+                    }
+                }
+            }
             Keysym::BackSpace => self.up(),
             Keysym::Escape => {
                 if self.pick.is_some() {
